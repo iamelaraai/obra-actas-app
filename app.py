@@ -401,7 +401,7 @@ with tab0:
     base_df.loc[base_df["Acta No"].astype(str).str.strip() == "", "Acta No"] = acta_no_form
     base_df.loc[base_df["Fecha comité"].astype(str).str.strip() == "", "Fecha comité"] = fecha_form
 
-    auto_obs = st.toggle("Autopoblar observaciones desde Estado + Notas rápidas", value=True)
+    auto_obs = st.toggle("Autopoblar observaciones desde Estado + Notas rápidas", value=False)
 
     edited_df = st.data_editor(
         base_df,
@@ -419,7 +419,6 @@ with tab0:
     current = edited_df[base_cols].copy() if isinstance(edited_df, pd.DataFrame) else base_df.copy()
 
     if auto_obs and not current.empty:
-        changed = False
         for i, r in current.iterrows():
             comp = clean_text(r.get("Compromiso", ""))
             estado = clean_text(r.get("Estado", ""))
@@ -435,10 +434,6 @@ with tab0:
                 )
                 if nueva != obs:
                     current.at[i, "Observación seguimiento"] = nueva
-                    changed = True
-        if changed:
-            st.session_state["captura_df"] = current
-            st.rerun()
 
     st.session_state["captura_df"] = current
 
