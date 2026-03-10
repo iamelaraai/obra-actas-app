@@ -194,7 +194,7 @@ ${compromisos || "(Sin compromisos cargados)"}`;
                     <td><textarea className="input" value={r.compromiso} onChange={(e) => update(i, "compromiso", e.target.value)} /></td>
                     <td><input className="input" value={r.componente} onChange={(e) => update(i, "componente", e.target.value)} /></td>
                     <td><input className="input" value={r.responsable} onChange={(e) => update(i, "responsable", e.target.value)} /></td>
-                    <td><input className="input" value={r.fechaLimite} onChange={(e) => update(i, "fechaLimite", e.target.value)} /></td>
+                    <td><input type="date" className="input" value={r.fechaLimite} onChange={(e) => update(i, "fechaLimite", e.target.value)} /></td>
                     <td>
                       <select className="input" value={r.estado} onChange={(e) => update(i, "estado", e.target.value)}>
                         {ESTADOS.map((s) => <option key={s}>{s}</option>)}
