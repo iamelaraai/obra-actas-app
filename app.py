@@ -352,8 +352,8 @@ editable = None
 texto_acta = ""
 
 with tab0:
-    st.subheader("Ingreso simple de compromisos (sin pelear con Excel)")
-    st.caption("Tu hermano llena esta tabla guiada y descarga un Excel limpio listo para usar en el Tab 1.")
+    st.subheader("Ingreso simple de compromisos (estable)")
+    st.caption("Modo estable: editas la tabla y aplicas cambios con un clic para evitar reseteos al escribir.")
 
     c0a, c0b, c0c = st.columns(3)
     with c0a:
@@ -375,22 +375,21 @@ with tab0:
         "Notas rápidas",
         "Observación seguimiento",
     ]
+
     if "captura_df" not in st.session_state:
         st.session_state["captura_df"] = pd.DataFrame(
-            [
-                {
-                    "Acta No": acta_no_form,
-                    "Fecha comité": fecha_form,
-                    "Actor": actor_default,
-                    "Compromiso": "",
-                    "Componente": "Técnico",
-                    "Responsable": "",
-                    "Fecha límite": "",
-                    "Estado": "En proceso",
-                    "Notas rápidas": "",
-                    "Observación seguimiento": "",
-                }
-            ]
+            [{
+                "Acta No": acta_no_form,
+                "Fecha comité": fecha_form,
+                "Actor": actor_default,
+                "Compromiso": "",
+                "Componente": "Técnico",
+                "Responsable": "",
+                "Fecha límite": "",
+                "Estado": "En proceso",
+                "Notas rápidas": "",
+                "Observación seguimiento": "",
+            }]
         )
 
     base_df = st.session_state["captura_df"].copy()
@@ -398,47 +397,53 @@ with tab0:
         if col not in base_df.columns:
             base_df[col] = ""
     base_df = base_df[base_cols]
-    base_df.loc[base_df["Acta No"].astype(str).str.strip() == "", "Acta No"] = acta_no_form
-    base_df.loc[base_df["Fecha comité"].astype(str).str.strip() == "", "Fecha comité"] = fecha_form
 
-    auto_obs = st.toggle("Autopoblar observaciones desde Estado + Notas rápidas", value=False)
-
-    edited_df = st.data_editor(
-        base_df,
-        use_container_width=True,
-        num_rows="dynamic",
-        key="captura_editor",
-        column_config={
-            "Actor": st.column_config.SelectboxColumn("Actor", options=["EDU", "Contratista", "Interventoría"]),
-            "Estado": st.column_config.SelectboxColumn("Estado", options=[""] + ESTADOS),
-        },
+    auto_obs = st.toggle("Autocompletar observaciones desde Estado + Notas rápidas", value=False)
+    estilo_auto = st.selectbox(
+        "Estilo de redacción para autocompletado",
+        ["Interventoría formal", "Ejecutivo corto", "Operativo campo", "Neutro estándar"],
+        index=0,
+        disabled=not auto_obs,
     )
 
-    st.caption("💾 Autosave activo: los cambios se guardan automáticamente.")
+    with st.form("tabla_compromisos_form"):
+        edited_df = st.data_editor(
+            base_df,
+            use_container_width=True,
+            num_rows="dynamic",
+            key="captura_editor_form",
+            column_config={
+                "Actor": st.column_config.SelectboxColumn("Actor", options=["EDU", "Contratista", "Interventoría"]),
+                "Estado": st.column_config.SelectboxColumn("Estado", options=[""] + ESTADOS),
+            },
+        )
+        apply_changes = st.form_submit_button("✅ Aplicar cambios de tabla")
 
-    current = edited_df[base_cols].copy() if isinstance(edited_df, pd.DataFrame) else base_df.copy()
+    if apply_changes:
+        current = edited_df[base_cols].copy()
+        current.loc[current["Acta No"].astype(str).str.strip() == "", "Acta No"] = acta_no_form
+        current.loc[current["Fecha comité"].astype(str).str.strip() == "", "Fecha comité"] = fecha_form
 
-    if auto_obs and not current.empty:
-        for i, r in current.iterrows():
-            comp = clean_text(r.get("Compromiso", ""))
-            estado = clean_text(r.get("Estado", ""))
-            notas = clean_text(r.get("Notas rápidas", ""))
-            obs = clean_text(r.get("Observación seguimiento", ""))
-            if comp and estado and notas and (not obs or obs.startswith("Desde ") or obs.startswith("Compromiso ")):
-                nueva = generar_observacion_breve(
-                    estado,
-                    clean_text(r.get("Actor", "")),
-                    comp,
-                    notas,
-                    "Interventoría formal",
-                )
-                if nueva != obs:
-                    current.at[i, "Observación seguimiento"] = nueva
+        if auto_obs and not current.empty:
+            for i, r in current.iterrows():
+                comp = clean_text(r.get("Compromiso", ""))
+                estado = clean_text(r.get("Estado", ""))
+                notas = clean_text(r.get("Notas rápidas", ""))
+                obs = clean_text(r.get("Observación seguimiento", ""))
+                if comp and estado and notas and (not obs or obs.startswith("Desde ") or obs.startswith("Compromiso ")):
+                    current.at[i, "Observación seguimiento"] = generar_observacion_breve(
+                        estado,
+                        clean_text(r.get("Actor", "")),
+                        comp,
+                        notas,
+                        estilo_auto,
+                    )
 
-    st.session_state["captura_df"] = current
+        st.session_state["captura_df"] = current
+        st.success("Cambios aplicados correctamente.")
 
-    # Tabla procesada (solo filas con compromiso)
-    captura_df = current[current["Compromiso"].astype(str).str.strip() != ""].copy()
+    captura_df_visible = st.session_state["captura_df"].copy()
+    captura_df = captura_df_visible[captura_df_visible["Compromiso"].astype(str).str.strip() != ""].copy()
 
     if not captura_df.empty:
         captura_df.insert(
@@ -449,37 +454,6 @@ with tab0:
 
         st.success(f"Compromisos capturados: {len(captura_df)}")
 
-        st.markdown("### ✍️ Redactor breve de observaciones")
-        st.caption("Escribe notas cortas y genera una observación formal lista para pegar en la columna de seguimiento.")
-        rx1, rx2 = st.columns(2)
-        with rx1:
-            idx = st.selectbox("Selecciona compromiso", options=list(captura_df.index), format_func=lambda i: f"{captura_df.loc[i, 'Actor']} · {str(captura_df.loc[i, 'Compromiso'])[:80]}")
-            est_sel = st.selectbox("Estado para redactar", options=ESTADOS, index=max(ESTADOS.index(captura_df.loc[idx, 'Estado']) if captura_df.loc[idx, 'Estado'] in ESTADOS else 1, 0))
-        with rx2:
-            estilo_sel = st.selectbox(
-                "Estilo de redacción",
-                ["Interventoría formal", "Ejecutivo corto", "Operativo campo", "Neutro estándar"],
-                index=0,
-            )
-            notas_cortas = st.text_area("Notas rápidas (2-10 palabras)", placeholder="ej: pendiente respuesta de SIF sobre alcance de red", height=90)
-
-        obs_generada = generar_observacion_breve(
-            est_sel,
-            str(captura_df.loc[idx, "Actor"]),
-            str(captura_df.loc[idx, "Compromiso"]),
-            notas_cortas,
-            estilo_sel,
-        )
-        st.text_area("Observación sugerida", value=obs_generada, height=110)
-
-        if st.button("Usar observación sugerida en la fila seleccionada"):
-            full_df = st.session_state["captura_df"].copy()
-            if idx in full_df.index:
-                full_df.loc[idx, "Estado"] = est_sel
-                full_df.loc[idx, "Observación seguimiento"] = obs_generada
-                st.session_state["captura_df"] = full_df
-                st.success("Observación aplicada en la fila seleccionada.")
-                st.rerun()
         st.download_button(
             "⬇️ Descargar Excel de compromisos (simple)",
             data=to_xlsx_bytes(captura_df, sheet_name=f"Acta_{acta_no_form}"),
@@ -513,7 +487,7 @@ with tab0:
 
         st.info("Tip: este Excel simple te sirve como base maestra. También puedes pasarlo directo a Tab 3 para generar acta completa.")
     else:
-        st.warning("Agrega al menos un compromiso con texto para habilitar descargas.")
+        st.warning("Agrega al menos un compromiso con texto y aplica cambios para habilitar descargas.")
 
 with tab1:
     archivo = st.file_uploader("Sube el Excel de compromisos", type=["xlsx", "xlsm", "xlsb"], key="excel")
