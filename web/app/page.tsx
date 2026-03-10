@@ -1,6 +1,9 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import asistentesData from "../lib/asistentes_maestro.json";
+
+type Asistente = { entidad: "SIF" | "EDU" | "Interventoría" | "Contratista"; nombre: string; cargo: string };
 
 type Row = {
   actaNo: string;
@@ -81,6 +84,12 @@ export default function Home() {
   const [resumenEjecutivo, setResumenEjecutivo] = useState("");
   const [resumenReunion, setResumenReunion] = useState("");
 
+  const asistentesCatalogo = asistentesData as Asistente[];
+  const [selSIF, setSelSIF] = useState<string[]>([]);
+  const [selEDU, setSelEDU] = useState<string[]>([]);
+  const [selINT, setSelINT] = useState<string[]>([]);
+  const [selCON, setSelCON] = useState<string[]>([]);
+
   const update = (idx: number, key: keyof Row, value: string) => {
     setRows((prev) => {
       const next = [...prev];
@@ -120,6 +129,11 @@ export default function Home() {
 
   const prompt = useMemo(() => buildTranscriptPrompt(contexto, transcript), [contexto, transcript]);
 
+  const namesByEntidad = (entidad: Asistente["entidad"]) =>
+    asistentesCatalogo.filter((a) => a.entidad === entidad).map((a) => a.nombre);
+
+  const asistentesTotal = selSIF.length + selEDU.length + selINT.length + selCON.length;
+
   const actaMd = useMemo(() => {
     const compromisos = rows
       .filter((r) => r.compromiso.trim())
@@ -135,6 +149,13 @@ export default function Home() {
 **Lugar:** ${lugar}
 **Hora inicio:** ${horaInicio}
 **Hora fin:** ${horaFin}
+**Asistentes:** ${asistentesTotal}
+
+## Asistentes
+- **SIF:** ${selSIF.join(", ") || "(sin selección)"}
+- **EDU:** ${selEDU.join(", ") || "(sin selección)"}
+- **Interventoría:** ${selINT.join(", ") || "(sin selección)"}
+- **Contratista:** ${selCON.join(", ") || "(sin selección)"}
 
 ## 1) Resumen ejecutivo
 ${resumenEjecutivo || "(Completar)"}
@@ -144,7 +165,7 @@ ${resumenReunion || "(Pegar aquí resumen de reunión)"}
 
 ## 3) Compromisos, comentarios y observaciones
 ${compromisos || "(Sin compromisos cargados)"}`;
-  }, [rows, actaNo, proyecto, fecha, lugar, horaInicio, horaFin, resumenEjecutivo, resumenReunion]);
+  }, [rows, actaNo, proyecto, fecha, lugar, horaInicio, horaFin, resumenEjecutivo, resumenReunion, asistentesTotal, selSIF, selEDU, selINT, selCON]);
 
   const exportOfficialExcel = async () => {
     if (!officialTemplate) {
@@ -236,7 +257,14 @@ ${compromisos || "(Sin compromisos cargados)"}`;
                     </td>
                     <td><textarea className="input" value={r.compromiso} onChange={(e) => update(i, "compromiso", e.target.value)} /></td>
                     <td><input className="input" value={r.componente} onChange={(e) => update(i, "componente", e.target.value)} /></td>
-                    <td><input className="input" value={r.responsable} onChange={(e) => update(i, "responsable", e.target.value)} /></td>
+                    <td>
+                      <select className="input" value={r.responsable} onChange={(e) => update(i, "responsable", e.target.value)}>
+                        <option value="">(vacío)</option>
+                        <option value="EDU">EDU</option>
+                        <option value="Interventoría">Interventoría</option>
+                        <option value="Contratista">Contratista</option>
+                      </select>
+                    </td>
                     <td><input type="date" className="input" value={r.fechaLimite} onChange={(e) => update(i, "fechaLimite", e.target.value)} /></td>
                     <td>
                       <select className="input" value={r.estado} onChange={(e) => update(i, "estado", e.target.value)}>
@@ -329,6 +357,37 @@ ${compromisos || "(Sin compromisos cargados)"}`;
             <input className="input" placeholder="Lugar" value={lugar} onChange={(e) => setLugar(e.target.value)} />
             <input className="input" placeholder="Hora inicio" value={horaInicio} onChange={(e) => setHoraInicio(e.target.value)} />
             <input className="input" placeholder="Hora fin" value={horaFin} onChange={(e) => setHoraFin(e.target.value)} />
+          </div>
+
+          <div className="card" style={{ marginTop: 8 }}>
+            <h4 style={{ marginTop: 0 }}>Asistentes (multiselección pre-cargada)</h4>
+            <p className="small">Tip: mantén presionado Ctrl/Cmd para seleccionar múltiples nombres.</p>
+            <div className="row">
+              <div>
+                <label className="small">SIF</label><br />
+                <select multiple className="input" style={{ minWidth: 260, minHeight: 120 }} value={selSIF} onChange={(e) => setSelSIF(Array.from(e.target.selectedOptions).map(o => o.value))}>
+                  {namesByEntidad("SIF").map((n) => <option key={n} value={n}>{n}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="small">EDU</label><br />
+                <select multiple className="input" style={{ minWidth: 260, minHeight: 120 }} value={selEDU} onChange={(e) => setSelEDU(Array.from(e.target.selectedOptions).map(o => o.value))}>
+                  {namesByEntidad("EDU").map((n) => <option key={n} value={n}>{n}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="small">Interventoría</label><br />
+                <select multiple className="input" style={{ minWidth: 260, minHeight: 120 }} value={selINT} onChange={(e) => setSelINT(Array.from(e.target.selectedOptions).map(o => o.value))}>
+                  {namesByEntidad("Interventoría").map((n) => <option key={n} value={n}>{n}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="small">Contratista</label><br />
+                <select multiple className="input" style={{ minWidth: 260, minHeight: 120 }} value={selCON} onChange={(e) => setSelCON(Array.from(e.target.selectedOptions).map(o => o.value))}>
+                  {namesByEntidad("Contratista").map((n) => <option key={n} value={n}>{n}</option>)}
+                </select>
+              </div>
+            </div>
           </div>
           <div className="row small" style={{ marginTop: 8 }}>
             <span>Excel actividades: {excelTemplateName || "(no cargada aún)"}</span>

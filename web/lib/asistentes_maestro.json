@@ -1,0 +1,36 @@
+[
+  {"entidad":"SIF","nombre":"Jose Antonio Montoya","cargo":"Supervisor SIF"},
+  {"entidad":"SIF","nombre":"Manuela Ciro Palacio","cargo":"Supervisor SIF"},
+  {"entidad":"SIF","nombre":"Luisa Fernanda Echeverry Muñoz","cargo":"Supervisor SIF"},
+
+  {"entidad":"EDU","nombre":"Mateo Yepes","cargo":"Supervisor de Contrato EDU"},
+  {"entidad":"EDU","nombre":"Adriana Gutiérrez","cargo":"Apoyo Supervisión componente técnico EDU"},
+  {"entidad":"EDU","nombre":"Paula Quintero","cargo":"Apoyo Supervisión componente técnico EDU"},
+  {"entidad":"EDU","nombre":"Harvey Restrepo","cargo":"Apoyo supervisión componente técnico EDU"},
+  {"entidad":"EDU","nombre":"Saray Arango","cargo":"Apoyo Supervisión componente técnico EDU"},
+  {"entidad":"EDU","nombre":"Jonathan Giraldo","cargo":"Apoyo Supervisión componente técnico EDU"},
+  {"entidad":"EDU","nombre":"Juan Felipe Estrada","cargo":"Apoyo Supervisión componente arquitectura EDU"},
+  {"entidad":"EDU","nombre":"Malfi Garcia","cargo":"Apoyo a la supervisión componente Ambiental EDU"},
+  {"entidad":"EDU","nombre":"Paola Marinez","cargo":"Apoyo a la supervisión componente Forestal EDU"},
+  {"entidad":"EDU","nombre":"Alexandra García","cargo":"Apoyo a la supervisión componente SST EDU"},
+  {"entidad":"EDU","nombre":"Jailer Vahos","cargo":"Apoyo a la supervisión componente SST EDU"},
+  {"entidad":"EDU","nombre":"Wilson Avendaño","cargo":"Coordinador contrato interadministrativo EDU - SIF"},
+  {"entidad":"EDU","nombre":"Paula Ospina","cargo":"Apoyo a la supervisión componente Social EDU"},
+
+  {"entidad":"Interventoría","nombre":"Luisa Fernanda Guerra","cargo":"Residente Social"},
+  {"entidad":"Interventoría","nombre":"Adriana Manco","cargo":"Residente SST"},
+  {"entidad":"Interventoría","nombre":"Carlos Andrés Dávila C.","cargo":"Residente Ambiental"},
+  {"entidad":"Interventoría","nombre":"Luisa Fernanda Cossio","cargo":"Representante Legal"},
+  {"entidad":"Interventoría","nombre":"Juan Diego Cardona","cargo":"Director Técnico"},
+  {"entidad":"Interventoría","nombre":"Ana María Zapata","cargo":"Profesional BIM"},
+  {"entidad":"Interventoría","nombre":"Sergio Montoya","cargo":"Director Urbanismo"},
+  {"entidad":"Interventoría","nombre":"Miguel Herrera","cargo":"Coordinador"},
+
+  {"entidad":"Contratista","nombre":"Juan Carlos Restrepo","cargo":"Residente Ambiental"},
+  {"entidad":"Contratista","nombre":"Alejandra Rúa","cargo":"Residente Social"},
+  {"entidad":"Contratista","nombre":"José Alejandro Duque","cargo":"Coordinador"},
+  {"entidad":"Contratista","nombre":"Santiago Gutiérrez","cargo":"Gerente Técnico (Conintel)"},
+  {"entidad":"Contratista","nombre":"Kellys Alvarez","cargo":"Residente SST"},
+  {"entidad":"Contratista","nombre":"Marcela Cardona","cargo":"Directora Urbanismo"},
+  {"entidad":"Contratista","nombre":"John Jairo Giraldo","cargo":"Director Técnico"}
+]
