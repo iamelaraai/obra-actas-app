@@ -193,6 +193,35 @@ Devuelve SOLO con esta estructura:
 """
 
 
+def generar_observacion_breve(estado: str, actor: str, compromiso: str, notas: str):
+    est = (estado or "").strip().lower()
+    actor_txt = actor or "El responsable"
+    c = clean_text(compromiso)
+    n = clean_text(notas)
+
+    if est == "cumplido":
+        base = f"Desde {actor_txt} se informa que se dio cumplimiento al compromiso: {c}."
+        extra = f" Se deja como soporte: {n}." if n else ""
+        return base + extra
+
+    if est == "no cumplido":
+        base = f"Desde {actor_txt} se informa que no se ha dado cumplimiento al compromiso: {c}."
+        extra = f" Se reporta: {n}." if n else ""
+        return base + extra + " Se traslada para seguimiento en el próximo comité."
+
+    if est == "cumplido parcialmente":
+        base = f"Desde {actor_txt} se informa cumplimiento parcial del compromiso: {c}."
+        extra = f" Avance reportado: {n}." if n else ""
+        return base + extra + " Se requiere completar actividades pendientes."
+
+    if est == "en proceso":
+        base = f"Desde {actor_txt} se informa que el compromiso {c} se encuentra en proceso."
+        extra = f" Se reporta: {n}." if n else ""
+        return base + extra + " Se mantiene seguimiento en el próximo comité."
+
+    return f"Observación sobre el compromiso '{c}': {n}" if n else f"Observación pendiente de completar para el compromiso: {c}."
+
+
 def to_xlsx_bytes(df: pd.DataFrame, sheet_name: str = "compromisos"):
     bio = io.BytesIO()
     with pd.ExcelWriter(bio, engine="openpyxl") as writer:
@@ -275,6 +304,28 @@ with tab0:
         )
 
         st.success(f"Compromisos capturados: {len(captura_df)}")
+
+        st.markdown("### ✍️ Redactor breve de observaciones")
+        st.caption("Escribe notas cortas y genera una observación formal lista para pegar en la columna de seguimiento.")
+        rx1, rx2 = st.columns(2)
+        with rx1:
+            idx = st.selectbox("Selecciona compromiso", options=list(captura_df.index), format_func=lambda i: f"{captura_df.loc[i, 'Actor']} · {str(captura_df.loc[i, 'Compromiso'])[:80]}")
+            est_sel = st.selectbox("Estado para redactar", options=ESTADOS, index=max(ESTADOS.index(captura_df.loc[idx, 'Estado']) if captura_df.loc[idx, 'Estado'] in ESTADOS else 1, 0))
+        with rx2:
+            notas_cortas = st.text_area("Notas rápidas (2-10 palabras)", placeholder="ej: pendiente respuesta de SIF sobre alcance de red", height=90)
+
+        obs_generada = generar_observacion_breve(
+            est_sel,
+            str(captura_df.loc[idx, "Actor"]),
+            str(captura_df.loc[idx, "Compromiso"]),
+            notas_cortas,
+        )
+        st.text_area("Observación sugerida", value=obs_generada, height=110)
+
+        if st.button("Usar observación sugerida en la fila seleccionada"):
+            captura_df.loc[idx, "Estado"] = est_sel
+            captura_df.loc[idx, "Observación seguimiento"] = obs_generada
+            st.success("Observación aplicada en la fila seleccionada.")
         st.download_button(
             "⬇️ Descargar Excel de compromisos (simple)",
             data=to_xlsx_bytes(captura_df, sheet_name=f"Acta_{acta_no_form}"),
