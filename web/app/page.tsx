@@ -26,7 +26,25 @@ function generarObs(estado: string, actor: string, compromiso: string, notas: st
   return `Desde ${actor} se informa ${e || "estado pendiente"} del compromiso: ${compromiso}. ${notas ? `Se reporta: ${notas}.` : ""}`;
 }
 
+function buildTranscriptPrompt(contexto: string, transcript: string) {
+  return `Eres asistente de interventoría de obra. Redacta sección de acta en español formal y técnico.
+
+Contexto del proyecto:
+${contexto}
+
+Transcripción de reunión:
+${transcript}
+
+Devuelve SOLO con esta estructura:
+1) Decisiones tomadas
+2) Avances reportados
+3) Riesgos y atrasos críticos
+4) Compromisos nuevos (tabla en markdown con: compromiso, responsable, fecha límite, componente)
+5) Observaciones de cierre`;
+}
+
 export default function Home() {
+  const [tab, setTab] = useState<"t1" | "t2" | "t3">("t1");
   const [autoObs, setAutoObs] = useState(false);
   const [estilo, setEstilo] = useState<(typeof ESTILOS)[number]>("Interventoría formal");
   const [rows, setRows] = useState<Row[]>([
@@ -43,6 +61,18 @@ export default function Home() {
       observacion: ""
     }
   ]);
+
+  const [contexto, setContexto] = useState("Proyecto: Parque Primavera Norte. Documento: acta de comité de obra.");
+  const [transcript, setTranscript] = useState("");
+
+  const [proyecto, setProyecto] = useState("Parque Primavera Norte");
+  const [actaNo, setActaNo] = useState("19");
+  const [fecha, setFecha] = useState(new Date().toLocaleDateString("es-CO"));
+  const [lugar, setLugar] = useState("Campamento de obra");
+  const [horaInicio, setHoraInicio] = useState("09:30 AM");
+  const [horaFin, setHoraFin] = useState("11:30 AM");
+  const [resumenEjecutivo, setResumenEjecutivo] = useState("");
+  const [resumenReunion, setResumenReunion] = useState("");
 
   const update = (idx: number, key: keyof Row, value: string) => {
     setRows((prev) => {
@@ -81,66 +111,133 @@ export default function Home() {
     return [headers, ...lines].join("\n");
   }, [rows]);
 
+  const prompt = useMemo(() => buildTranscriptPrompt(contexto, transcript), [contexto, transcript]);
+
+  const actaMd = useMemo(() => {
+    const compromisos = rows
+      .filter((r) => r.compromiso.trim())
+      .map(
+        (r) =>
+          `- **${r.compromiso}** (${r.componente}) — Responsable: ${r.responsable || r.actor}. Estado: ${r.estado}. Fecha: ${r.fechaLimite || "Sin fecha"}. Observación: ${r.observacion || "N/A"}.`
+      )
+      .join("\n");
+
+    return `# Acta de Comité de Obra No. ${actaNo}
+**Proyecto:** ${proyecto}
+**Fecha:** ${fecha}
+**Lugar:** ${lugar}
+**Hora inicio:** ${horaInicio}
+**Hora fin:** ${horaFin}
+
+## 1) Resumen ejecutivo
+${resumenEjecutivo || "(Completar)"}
+
+## 2) Decisiones y temas relevantes
+${resumenReunion || "(Pegar aquí resumen de reunión)"}
+
+## 3) Compromisos, comentarios y observaciones
+${compromisos || "(Sin compromisos cargados)"}`;
+  }, [rows, actaNo, proyecto, fecha, lugar, horaInicio, horaFin, resumenEjecutivo, resumenReunion]);
+
   return (
     <div className="wrap">
       <h1>Obra Actas — Web (Next.js/Vercel prototype)</h1>
-      <p className="small">Objetivo: validar comportamiento en Vercel sin resets al editar/pegar.</p>
+      <p className="small">Validación web: edición estable + transcripción + acta completa (MVP).</p>
 
       <div className="card row">
-        <label>
-          <input type="checkbox" checked={autoObs} onChange={(e) => setAutoObs(e.target.checked)} /> Autocompletar observaciones
-        </label>
-        <select value={estilo} onChange={(e) => setEstilo(e.target.value as (typeof ESTILOS)[number])} className="input" disabled={!autoObs}>
-          {ESTILOS.map((e) => (
-            <option key={e}>{e}</option>
-          ))}
-        </select>
-        <button className="btn" onClick={addRow}>+ Agregar fila</button>
+        <button className="btn" onClick={() => setTab("t1")}>1) Compromisos</button>
+        <button className="btn secondary" onClick={() => setTab("t2")}>2) Transcripción</button>
+        <button className="btn secondary" onClick={() => setTab("t3")}>3) Acta completa</button>
       </div>
 
-      <div className="card" style={{ overflowX: "auto" }}>
-        <table className="table">
-          <thead>
-            <tr>
-              <th>Acta</th><th>Fecha</th><th>Actor</th><th>Compromiso</th><th>Componente</th><th>Responsable</th><th>Fecha límite</th><th>Estado</th><th>Notas rápidas</th><th>Observación</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((r, i) => (
-              <tr key={i}>
-                <td><input className="input" value={r.actaNo} onChange={(e) => update(i, "actaNo", e.target.value)} /></td>
-                <td><input className="input" value={r.fechaComite} onChange={(e) => update(i, "fechaComite", e.target.value)} /></td>
-                <td>
-                  <select className="input" value={r.actor} onChange={(e) => update(i, "actor", e.target.value)}>
-                    <option>EDU</option><option>Contratista</option><option>Interventoría</option>
-                  </select>
-                </td>
-                <td><textarea className="input" value={r.compromiso} onChange={(e) => update(i, "compromiso", e.target.value)} /></td>
-                <td><input className="input" value={r.componente} onChange={(e) => update(i, "componente", e.target.value)} /></td>
-                <td><input className="input" value={r.responsable} onChange={(e) => update(i, "responsable", e.target.value)} /></td>
-                <td><input className="input" value={r.fechaLimite} onChange={(e) => update(i, "fechaLimite", e.target.value)} /></td>
-                <td>
-                  <select className="input" value={r.estado} onChange={(e) => update(i, "estado", e.target.value)}>
-                    {ESTADOS.map((s) => <option key={s}>{s}</option>)}
-                  </select>
-                </td>
-                <td><input className="input" value={r.notasRapidas} onChange={(e) => update(i, "notasRapidas", e.target.value)} /></td>
-                <td><textarea className="input" value={r.observacion} onChange={(e) => update(i, "observacion", e.target.value)} /></td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      {tab === "t1" && (
+        <>
+          <div className="card row">
+            <label>
+              <input type="checkbox" checked={autoObs} onChange={(e) => setAutoObs(e.target.checked)} /> Autocompletar observaciones
+            </label>
+            <select value={estilo} onChange={(e) => setEstilo(e.target.value as (typeof ESTILOS)[number])} className="input" disabled={!autoObs}>
+              {ESTILOS.map((e) => (
+                <option key={e}>{e}</option>
+              ))}
+            </select>
+            <button className="btn" onClick={addRow}>+ Agregar fila</button>
+          </div>
 
-      <div className="card row">
-        <a
-          className="btn secondary"
-          href={`data:text/csv;charset=utf-8,${encodeURIComponent(csv)}`}
-          download="compromisos_web.csv"
-        >
-          Descargar CSV
-        </a>
-      </div>
+          <div className="card" style={{ overflowX: "auto" }}>
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Acta</th><th>Fecha</th><th>Actor</th><th>Compromiso</th><th>Componente</th><th>Responsable</th><th>Fecha límite</th><th>Estado</th><th>Notas rápidas</th><th>Observación</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((r, i) => (
+                  <tr key={i}>
+                    <td><input className="input" value={r.actaNo} onChange={(e) => update(i, "actaNo", e.target.value)} /></td>
+                    <td><input className="input" value={r.fechaComite} onChange={(e) => update(i, "fechaComite", e.target.value)} /></td>
+                    <td>
+                      <select className="input" value={r.actor} onChange={(e) => update(i, "actor", e.target.value)}>
+                        <option>EDU</option><option>Contratista</option><option>Interventoría</option>
+                      </select>
+                    </td>
+                    <td><textarea className="input" value={r.compromiso} onChange={(e) => update(i, "compromiso", e.target.value)} /></td>
+                    <td><input className="input" value={r.componente} onChange={(e) => update(i, "componente", e.target.value)} /></td>
+                    <td><input className="input" value={r.responsable} onChange={(e) => update(i, "responsable", e.target.value)} /></td>
+                    <td><input className="input" value={r.fechaLimite} onChange={(e) => update(i, "fechaLimite", e.target.value)} /></td>
+                    <td>
+                      <select className="input" value={r.estado} onChange={(e) => update(i, "estado", e.target.value)}>
+                        {ESTADOS.map((s) => <option key={s}>{s}</option>)}
+                      </select>
+                    </td>
+                    <td><input className="input" value={r.notasRapidas} onChange={(e) => update(i, "notasRapidas", e.target.value)} /></td>
+                    <td><textarea className="input" value={r.observacion} onChange={(e) => update(i, "observacion", e.target.value)} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="card row">
+            <a className="btn secondary" href={`data:text/csv;charset=utf-8,${encodeURIComponent(csv)}`} download="compromisos_web.csv">
+              Descargar CSV
+            </a>
+          </div>
+        </>
+      )}
+
+      {tab === "t2" && (
+        <div className="card">
+          <h3>Transcripción y resumen (prompt maestro)</h3>
+          <p className="small">Pega transcript de reunión y úsalo en Claude/Codex/ChatGPT.</p>
+          <textarea className="input" style={{ width: "100%", minHeight: 80 }} value={contexto} onChange={(e) => setContexto(e.target.value)} />
+          <textarea className="input" style={{ width: "100%", minHeight: 180, marginTop: 8 }} placeholder="Pega aquí la transcripción..." value={transcript} onChange={(e) => setTranscript(e.target.value)} />
+          <textarea className="input" style={{ width: "100%", minHeight: 220, marginTop: 8 }} value={prompt} readOnly />
+          <a className="btn secondary" href={`data:text/plain;charset=utf-8,${encodeURIComponent(prompt)}`} download="prompt_resumen_acta.txt">
+            Descargar prompt
+          </a>
+        </div>
+      )}
+
+      {tab === "t3" && (
+        <div className="card">
+          <h3>Acta completa (MVP)</h3>
+          <div className="row">
+            <input className="input" placeholder="Proyecto" value={proyecto} onChange={(e) => setProyecto(e.target.value)} />
+            <input className="input" placeholder="No. Acta" value={actaNo} onChange={(e) => setActaNo(e.target.value)} />
+            <input className="input" placeholder="Fecha" value={fecha} onChange={(e) => setFecha(e.target.value)} />
+            <input className="input" placeholder="Lugar" value={lugar} onChange={(e) => setLugar(e.target.value)} />
+            <input className="input" placeholder="Hora inicio" value={horaInicio} onChange={(e) => setHoraInicio(e.target.value)} />
+            <input className="input" placeholder="Hora fin" value={horaFin} onChange={(e) => setHoraFin(e.target.value)} />
+          </div>
+          <textarea className="input" style={{ width: "100%", minHeight: 90, marginTop: 8 }} placeholder="Resumen ejecutivo" value={resumenEjecutivo} onChange={(e) => setResumenEjecutivo(e.target.value)} />
+          <textarea className="input" style={{ width: "100%", minHeight: 140, marginTop: 8 }} placeholder="Decisiones/avances/riesgos" value={resumenReunion} onChange={(e) => setResumenReunion(e.target.value)} />
+          <textarea className="input" style={{ width: "100%", minHeight: 260, marginTop: 8 }} value={actaMd} readOnly />
+          <a className="btn secondary" href={`data:text/markdown;charset=utf-8,${encodeURIComponent(actaMd)}`} download={`acta_${actaNo || "hoy"}.md`}>
+            Descargar Acta (.md)
+          </a>
+        </div>
+      )}
     </div>
   );
 }
