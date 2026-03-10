@@ -374,24 +374,34 @@ with tab0:
         "Estado",
         "Observación seguimiento",
     ]
-    seed = pd.DataFrame(
-        [
-            {
-                "Acta No": acta_no_form,
-                "Fecha comité": fecha_form,
-                "Actor": actor_default,
-                "Compromiso": "",
-                "Componente": "Técnico",
-                "Responsable": "",
-                "Fecha límite": "",
-                "Estado": "En proceso",
-                "Observación seguimiento": "",
-            }
-        ]
-    )
+    if "captura_df" not in st.session_state:
+        st.session_state["captura_df"] = pd.DataFrame(
+            [
+                {
+                    "Acta No": acta_no_form,
+                    "Fecha comité": fecha_form,
+                    "Actor": actor_default,
+                    "Compromiso": "",
+                    "Componente": "Técnico",
+                    "Responsable": "",
+                    "Fecha límite": "",
+                    "Estado": "En proceso",
+                    "Observación seguimiento": "",
+                }
+            ]
+        )
 
-    captura_df = st.data_editor(
-        seed,
+    # sincroniza metadatos por defecto en filas vacías
+    base_df = st.session_state["captura_df"].copy()
+    for col in base_cols:
+        if col not in base_df.columns:
+            base_df[col] = ""
+    base_df = base_df[base_cols]
+    base_df.loc[base_df["Acta No"].astype(str).str.strip() == "", "Acta No"] = acta_no_form
+    base_df.loc[base_df["Fecha comité"].astype(str).str.strip() == "", "Fecha comité"] = fecha_form
+
+    edited_df = st.data_editor(
+        base_df,
         use_container_width=True,
         num_rows="dynamic",
         key="captura_editor",
@@ -401,7 +411,9 @@ with tab0:
         },
     )
 
-    captura_df = captura_df[base_cols].copy()
+    st.session_state["captura_df"] = edited_df[base_cols].copy()
+
+    captura_df = st.session_state["captura_df"].copy()
     captura_df = captura_df[captura_df["Compromiso"].astype(str).str.strip() != ""]
 
     if not captura_df.empty:
@@ -437,9 +449,13 @@ with tab0:
         st.text_area("Observación sugerida", value=obs_generada, height=110)
 
         if st.button("Usar observación sugerida en la fila seleccionada"):
-            captura_df.loc[idx, "Estado"] = est_sel
-            captura_df.loc[idx, "Observación seguimiento"] = obs_generada
-            st.success("Observación aplicada en la fila seleccionada.")
+            full_df = st.session_state["captura_df"].copy()
+            if idx in full_df.index:
+                full_df.loc[idx, "Estado"] = est_sel
+                full_df.loc[idx, "Observación seguimiento"] = obs_generada
+                st.session_state["captura_df"] = full_df
+                st.success("Observación aplicada en la fila seleccionada.")
+                st.rerun()
         st.download_button(
             "⬇️ Descargar Excel de compromisos (simple)",
             data=to_xlsx_bytes(captura_df, sheet_name=f"Acta_{acta_no_form}"),
