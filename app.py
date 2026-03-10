@@ -411,9 +411,19 @@ with tab0:
         },
     )
 
-    # Evita sobreescrituras accidentales cuando Streamlit re-renderiza en estados intermedios
-    if isinstance(edited_df, pd.DataFrame) and set(base_cols).issubset(set(edited_df.columns)):
-        if len(edited_df) > 0 or len(st.session_state.get("captura_df", pd.DataFrame())) == 0:
+    g1, g2 = st.columns([1, 1])
+    with g1:
+        if st.button("💾 Guardar cambios de tabla"):
+            if isinstance(edited_df, pd.DataFrame) and set(base_cols).issubset(set(edited_df.columns)):
+                st.session_state["captura_df"] = edited_df[base_cols].copy()
+                st.success("Cambios guardados.")
+    with g2:
+        if st.button("↩️ Recuperar último guardado"):
+            st.rerun()
+
+    # Si no existe aún estado guardado, toma el editor inicial una sola vez
+    if "captura_df" not in st.session_state or st.session_state["captura_df"].empty:
+        if isinstance(edited_df, pd.DataFrame) and set(base_cols).issubset(set(edited_df.columns)):
             st.session_state["captura_df"] = edited_df[base_cols].copy()
 
     # Tabla visible (sin filtrar) y tabla procesada (solo filas con compromiso)
