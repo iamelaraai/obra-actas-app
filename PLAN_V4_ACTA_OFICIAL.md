@@ -25,6 +25,18 @@ Generar y usar una plantilla oficial `.docx` (con logos/estructura institucional
 
 ## Fases de implementación
 
+### Fase 0 — Evaluación de migración Next.js/Vercel (solicitado)
+- [ ] Definir alcance de migración (solo frontend o frontend+backend).
+- [ ] Diseñar arquitectura objetivo recomendada:
+  - Frontend: Next.js (Vercel)
+  - Backend de documentos: Python service (Render/Railway/Fly) para `.docx/.xlsx`
+- [ ] Validar riesgos de migrar lógica de Word/Excel 100% a Node (complejidad alta).
+- [ ] Entregar decisión técnica escrita: 
+  - Opción A (híbrida): Next.js + API Python
+  - Opción B (full Node): solo si se acepta menor robustez en formato Office
+- [ ] Plan de transición por etapas sin frenar operación actual en Streamlit.
+
+
 ### Fase 1 — Plantilla y mapeo (alta prioridad)
 - [ ] Crear copia de trabajo de la acta oficial como plantilla.
 - [ ] Definir placeholders simples:
