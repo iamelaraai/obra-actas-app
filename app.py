@@ -411,20 +411,14 @@ with tab0:
         },
     )
 
-    g1, g2 = st.columns([1, 1])
-    with g1:
-        if st.button("💾 Guardar cambios de tabla"):
-            if isinstance(edited_df, pd.DataFrame) and set(base_cols).issubset(set(edited_df.columns)):
-                st.session_state["captura_df"] = edited_df[base_cols].copy()
-                st.success("Cambios guardados.")
-    with g2:
-        if st.button("↩️ Recuperar último guardado"):
-            st.rerun()
+    st.caption("💾 Autosave activo: los cambios de la tabla se guardan automáticamente.")
 
-    # Si no existe aún estado guardado, toma el editor inicial una sola vez
-    if "captura_df" not in st.session_state or st.session_state["captura_df"].empty:
-        if isinstance(edited_df, pd.DataFrame) and set(base_cols).issubset(set(edited_df.columns)):
-            st.session_state["captura_df"] = edited_df[base_cols].copy()
+    # Autosave robusto: guarda en cada render válido del editor
+    if isinstance(edited_df, pd.DataFrame) and set(base_cols).issubset(set(edited_df.columns)):
+        current = edited_df[base_cols].copy()
+        prev = st.session_state.get("captura_df")
+        if prev is None or not isinstance(prev, pd.DataFrame) or not current.equals(prev[base_cols] if set(base_cols).issubset(set(prev.columns)) else prev):
+            st.session_state["captura_df"] = current
 
     # Tabla visible (sin filtrar) y tabla procesada (solo filas con compromiso)
     captura_df_visible = st.session_state["captura_df"].copy()
