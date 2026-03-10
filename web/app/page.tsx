@@ -72,8 +72,10 @@ export default function Home() {
   const [audioTranscripcionUrl, setAudioTranscripcionUrl] = useState("");
   const [excelTemplateName, setExcelTemplateName] = useState<string>("");
   const [wordTemplateName, setWordTemplateName] = useState<string>("");
+  const [wordTemplateFile, setWordTemplateFile] = useState<File | null>(null);
   const [officialTemplate, setOfficialTemplate] = useState<File | null>(null);
   const [exportingOfficial, setExportingOfficial] = useState(false);
+  const [exportingDocx, setExportingDocx] = useState(false);
 
   const [proyecto, setProyecto] = useState("Parque Primavera Norte");
   const [actaNo, setActaNo] = useState("19");
@@ -208,6 +210,52 @@ ${compromisos || "(Sin compromisos cargados)"}`;
     }
   };
 
+  const exportActaDocx = async () => {
+    if (!wordTemplateFile) {
+      alert("Primero carga la plantilla Word (.docx)");
+      return;
+    }
+    setExportingDocx(true);
+    try {
+      const payload = {
+        meta: {
+          objeto_proyecto: proyecto,
+          acta_no: actaNo,
+          fecha_larga: fecha,
+          lugar,
+          hora_inicio: horaInicio,
+          hora_fin: horaFin,
+        },
+        asistentes: {
+          sif: selSIF,
+          edu: selEDU,
+          interventoria: selINT,
+          contratista: selCON,
+        },
+        resumenReunion: resumenReunion || resumenEjecutivo,
+        rows: rows.filter((r) => r.compromiso.trim()),
+      };
+
+      const fd = new FormData();
+      fd.append("template", wordTemplateFile);
+      fd.append("payload", JSON.stringify(payload));
+
+      const res = await fetch("/api/generar-acta-docx", { method: "POST", body: fd });
+      if (!res.ok) throw new Error("No se pudo generar el acta .docx");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `acta_${actaNo || "hoy"}.docx`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      alert("Error generando acta .docx");
+    } finally {
+      setExportingDocx(false);
+    }
+  };
+
   const tabBtnClass = (t: "t1" | "t2" | "t3") => `btn ${tab === t ? "" : "secondary"}`;
 
   return (
@@ -335,7 +383,11 @@ ${compromisos || "(Sin compromisos cargados)"}`;
               type="file"
               className="input"
               accept=".docx"
-              onChange={(e) => setWordTemplateName(e.target.files?.[0]?.name || "")}
+              onChange={(e) => {
+                const f = e.target.files?.[0] || null;
+                setWordTemplateFile(f);
+                setWordTemplateName(f?.name || "");
+              }}
             />
             {wordTemplateName && <span className="small">Cargada: {wordTemplateName}</span>}
           </div>
@@ -398,9 +450,14 @@ ${compromisos || "(Sin compromisos cargados)"}`;
           <textarea className="input" style={{ width: "100%", minHeight: 90, marginTop: 8 }} placeholder="Resumen ejecutivo" value={resumenEjecutivo} onChange={(e) => setResumenEjecutivo(e.target.value)} />
           <textarea className="input" style={{ width: "100%", minHeight: 140, marginTop: 8 }} placeholder="Decisiones/avances/riesgos" value={resumenReunion} onChange={(e) => setResumenReunion(e.target.value)} />
           <textarea className="input" style={{ width: "100%", minHeight: 260, marginTop: 8 }} value={actaMd} readOnly />
-          <a className="btn secondary" href={`data:text/markdown;charset=utf-8,${encodeURIComponent(actaMd)}`} download={`acta_${actaNo || "hoy"}.md`}>
-            Descargar Acta (.md)
-          </a>
+          <div className="row">
+            <a className="btn secondary" href={`data:text/markdown;charset=utf-8,${encodeURIComponent(actaMd)}`} download={`acta_${actaNo || "hoy"}.md`}>
+              Descargar Acta (.md)
+            </a>
+            <button className="btn" onClick={exportActaDocx} disabled={!wordTemplateFile || exportingDocx}>
+              {exportingDocx ? "Generando DOCX..." : "Descargar Acta Final (.docx)"}
+            </button>
+          </div>
         </div>
       )}
     </div>
