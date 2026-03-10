@@ -208,6 +208,8 @@ ${compromisos || "(Sin compromisos cargados)"}`;
     }
   };
 
+  const tabBtnClass = (t: "t1" | "t2" | "t3") => `btn ${tab === t ? "" : "secondary"}`;
+
   return (
     <div className="wrap">
       <h1 className="title">📋 Obra Actas — Web</h1>
@@ -219,9 +221,9 @@ ${compromisos || "(Sin compromisos cargados)"}`;
       </div>
 
       <div className="card row">
-        <button className="btn" onClick={() => setTab("t1")}>1) Compromisos</button>
-        <button className="btn secondary" onClick={() => setTab("t2")}>2) Transcripción</button>
-        <button className="btn secondary" onClick={() => setTab("t3")}>3) Acta completa</button>
+        <button className={tabBtnClass("t1")} onClick={() => setTab("t1")}>1) Compromisos</button>
+        <button className={tabBtnClass("t2")} onClick={() => setTab("t2")}>2) Transcripción</button>
+        <button className={tabBtnClass("t3")} onClick={() => setTab("t3")}>3) Acta completa</button>
       </div>
 
       {tab === "t1" && (
