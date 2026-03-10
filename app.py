@@ -5,6 +5,7 @@ from datetime import datetime
 import pandas as pd
 import streamlit as st
 from docx import Document
+from openpyxl import load_workbook
 
 st.set_page_config(page_title="Actas de Obra - Generador", page_icon="📋", layout="wide")
 
@@ -264,6 +265,45 @@ def to_xlsx_bytes(df: pd.DataFrame, sheet_name: str = "compromisos"):
     return bio
 
 
+def to_official_template_bytes(template_file, df_simple: pd.DataFrame, sheet_name: str = "Acta 19"):
+    """Rellena plantilla oficial sin romper formato (colores, bordes, anchos)."""
+    wb = load_workbook(template_file)
+    if sheet_name not in wb.sheetnames:
+        sheet_name = wb.sheetnames[-1]
+    ws = wb[sheet_name]
+
+    # Limpia rango de datos (filas de compromisos) en columnas B:F, H:L, N:R
+    for row in range(4, 220):
+        for col in [2, 3, 4, 5, 6, 8, 9, 10, 11, 12, 14, 15, 16, 17, 18]:
+            ws.cell(row=row, column=col).value = None
+
+    # Mapeo de actor -> columna base
+    base_cols = {
+        "EDU": 2,           # B
+        "Contratista": 8,   # H
+        "Interventoría": 14 # N
+    }
+
+    for actor, base in base_cols.items():
+        sub = df_simple[df_simple["Actor"].astype(str).str.strip() == actor].reset_index(drop=True)
+        for i, (_, r) in enumerate(sub.iterrows(), start=4):
+            ws.cell(row=i, column=base).value = clean_text(r.get("Compromiso", ""))
+            ws.cell(row=i, column=base + 1).value = clean_text(r.get("Componente", ""))
+            ws.cell(row=i, column=base + 2).value = clean_text(r.get("Responsable", ""))
+
+            fecha = clean_text(r.get("Fecha límite", ""))
+            estado = clean_text(r.get("Estado", ""))
+            fc = "\n".join([x for x in [fecha, estado] if x])
+            ws.cell(row=i, column=base + 3).value = fc
+
+            ws.cell(row=i, column=base + 4).value = clean_text(r.get("Observación seguimiento", ""))
+
+    out = io.BytesIO()
+    wb.save(out)
+    out.seek(0)
+    return out
+
+
 st.title("📋 Generador de Actas de Obra (teach-friendly)")
 st.caption("Excel → compromisos normalizados → sección/acta Word + apoyo de transcripción")
 
@@ -379,6 +419,23 @@ with tab0:
             file_name=f"compromisos_acta_{acta_no_form}.csv",
             mime="text/csv",
         )
+
+        st.markdown("#### 🧩 Exportar en formato oficial (igual al institucional)")
+        st.caption("Sube la plantilla oficial (xlsx) y la app rellenará los compromisos manteniendo formato visual.")
+        t1, t2 = st.columns([2, 1])
+        with t1:
+            plantilla = st.file_uploader("Plantilla oficial (.xlsx)", type=["xlsx"], key="plantilla_oficial")
+        with t2:
+            nombre_hoja = st.text_input("Pestaña destino", value=f"Acta {acta_no_form}", key="hoja_destino")
+
+        if plantilla is not None:
+            oficial_bytes = to_official_template_bytes(plantilla, captura_df, sheet_name=nombre_hoja)
+            st.download_button(
+                "⬇️ Descargar Excel en formato oficial",
+                data=oficial_bytes,
+                file_name=f"compromisos_acta_{acta_no_form}_formato_oficial.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            )
 
         st.info("Tip: este Excel simple te sirve como base maestra. También puedes pasarlo directo a Tab 3 para generar acta completa.")
     else:

@@ -13,6 +13,7 @@ Aplicación interactiva en **Streamlit** para convertir la hoja de compromisos e
   - CSV normalizado
   - Markdown
   - Word (.docx)
+  - Excel en formato oficial (usando plantilla institucional .xlsx)
 
 ### 2) Transcripción y resumen
 - Recibe transcripción pegada por el usuario
