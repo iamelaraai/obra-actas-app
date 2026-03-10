@@ -193,13 +193,105 @@ Devuelve SOLO con esta estructura:
 """
 
 
+def to_xlsx_bytes(df: pd.DataFrame, sheet_name: str = "compromisos"):
+    bio = io.BytesIO()
+    with pd.ExcelWriter(bio, engine="openpyxl") as writer:
+        df.to_excel(writer, index=False, sheet_name=sheet_name)
+    bio.seek(0)
+    return bio
+
+
 st.title("📋 Generador de Actas de Obra (teach-friendly)")
 st.caption("Excel → compromisos normalizados → sección/acta Word + apoyo de transcripción")
 
-tab1, tab2, tab3 = st.tabs(["1) Compromisos desde Excel", "2) Transcripción y resumen", "3) Acta completa (1 clic)"])
+tab0, tab1, tab2, tab3 = st.tabs([
+    "0) Captura guiada de compromisos",
+    "1) Compromisos desde Excel",
+    "2) Transcripción y resumen",
+    "3) Acta completa (1 clic)",
+])
 
 editable = None
 texto_acta = ""
+
+with tab0:
+    st.subheader("Ingreso simple de compromisos (sin pelear con Excel)")
+    st.caption("Tu hermano llena esta tabla guiada y descarga un Excel limpio listo para usar en el Tab 1.")
+
+    c0a, c0b, c0c = st.columns(3)
+    with c0a:
+        acta_no_form = st.text_input("Acta No (captura)", value="19", key="acta_no_form")
+    with c0b:
+        fecha_form = st.text_input("Fecha comité (captura)", value=datetime.now().strftime("%d/%m/%Y"), key="fecha_form")
+    with c0c:
+        actor_default = st.selectbox("Actor por defecto", ["EDU", "Contratista", "Interventoría"], key="actor_default")
+
+    base_cols = [
+        "Acta No",
+        "Fecha comité",
+        "Actor",
+        "Compromiso",
+        "Componente",
+        "Responsable",
+        "Fecha límite",
+        "Estado",
+        "Observación seguimiento",
+    ]
+    seed = pd.DataFrame(
+        [
+            {
+                "Acta No": acta_no_form,
+                "Fecha comité": fecha_form,
+                "Actor": actor_default,
+                "Compromiso": "",
+                "Componente": "Técnico",
+                "Responsable": "",
+                "Fecha límite": "",
+                "Estado": "En proceso",
+                "Observación seguimiento": "",
+            }
+        ]
+    )
+
+    captura_df = st.data_editor(
+        seed,
+        use_container_width=True,
+        num_rows="dynamic",
+        key="captura_editor",
+        column_config={
+            "Actor": st.column_config.SelectboxColumn("Actor", options=["EDU", "Contratista", "Interventoría"]),
+            "Estado": st.column_config.SelectboxColumn("Estado", options=[""] + ESTADOS),
+        },
+    )
+
+    captura_df = captura_df[base_cols].copy()
+    captura_df = captura_df[captura_df["Compromiso"].astype(str).str.strip() != ""]
+
+    if not captura_df.empty:
+        captura_df.insert(
+            2,
+            "ID compromiso",
+            [f"A{a}-{str(act)[:3].upper()}-{str(i+1).zfill(3)}" for i, (a, act) in enumerate(zip(captura_df["Acta No"], captura_df["Actor"]))],
+        )
+
+        st.success(f"Compromisos capturados: {len(captura_df)}")
+        st.download_button(
+            "⬇️ Descargar Excel de compromisos (simple)",
+            data=to_xlsx_bytes(captura_df, sheet_name=f"Acta_{acta_no_form}"),
+            file_name=f"compromisos_acta_{acta_no_form}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+
+        st.download_button(
+            "⬇️ Descargar CSV (simple)",
+            data=captura_df.to_csv(index=False).encode("utf-8"),
+            file_name=f"compromisos_acta_{acta_no_form}.csv",
+            mime="text/csv",
+        )
+
+        st.info("Tip: este Excel simple te sirve como base maestra. También puedes pasarlo directo a Tab 3 para generar acta completa.")
+    else:
+        st.warning("Agrega al menos un compromiso con texto para habilitar descargas.")
 
 with tab1:
     archivo = st.file_uploader("Sube el Excel de compromisos", type=["xlsx", "xlsm", "xlsb"], key="excel")
@@ -214,8 +306,28 @@ with tab1:
         with c2:
             fecha_comite = st.text_input("Fecha comité", value=datetime.now().strftime("%d/%m/%Y"))
 
-        raw = pd.read_excel(archivo, sheet_name=sheet, header=None)
-        data = parse_sheet(raw, acta_no=acta_no or "", fecha_comite=fecha_comite)
+        # Soporta dos formatos:
+        # A) Formato legado por bloques (EDU/Contratista/Interventoría)
+        # B) Formato simple (tabla maestra con columnas)
+        data = pd.DataFrame()
+
+        try:
+            simple = pd.read_excel(archivo, sheet_name=sheet)
+            req = {"Acta No", "Fecha comité", "Actor", "Compromiso", "Componente", "Responsable", "Fecha límite", "Estado", "Observación seguimiento"}
+            if req.issubset(set(simple.columns)):
+                data = simple.copy()
+                if "ID compromiso" not in data.columns:
+                    data.insert(
+                        2,
+                        "ID compromiso",
+                        [f"A{a}-{str(act)[:3].upper()}-{str(i+1).zfill(3)}" for i, (a, act) in enumerate(zip(data["Acta No"], data["Actor"]))],
+                    )
+        except Exception:
+            pass
+
+        if data.empty:
+            raw = pd.read_excel(archivo, sheet_name=sheet, header=None)
+            data = parse_sheet(raw, acta_no=acta_no or "", fecha_comite=fecha_comite)
 
         if data.empty:
             st.warning("No se detectaron compromisos con la estructura esperada en esta pestaña.")
