@@ -38,12 +38,51 @@ ${contexto}
 Transcripción de reunión:
 ${transcript}
 
-Devuelve SOLO con esta estructura:
-1) Decisiones tomadas
-2) Avances reportados
-3) Riesgos y atrasos críticos
-4) Compromisos nuevos (tabla en markdown con: compromiso, responsable, fecha límite, componente)
-5) Observaciones de cierre`;
+Instrucciones de salida:
+- Devuelve la respuesta en texto plano (sin markdown, sin tablas markdown, sin asteriscos).
+- Organiza estrictamente con estos encabezados y en este orden:
+
+DECISIONES TOMADAS:
+- ...
+
+AVANCES REPORTADOS:
+- ...
+
+RIESGOS Y ATRASOS CRÍTICOS:
+- Riesgo: ...
+  Impacto: ...
+  Acción propuesta: ...
+  Responsable: ...
+  Fecha objetivo: ...
+
+COMPROMISOS NUEVOS:
+- Compromiso: ... | Responsable: ... | Fecha límite: ... | Componente: ...
+
+OBSERVACIONES DE CIERRE:
+- ...
+
+Si algún bloque no tiene información suficiente, escribe: "Sin información reportada".`;
+}
+
+function normalizeMeetingText(input: string) {
+  const txt = (input || "").trim();
+  if (!txt) return "";
+
+  const hasBlocks = /DECISIONES:|AVANCES:|RIESGOS|ATRASOS/i.test(txt);
+  if (hasBlocks) return txt;
+
+  const parts = txt
+    .split(/\n+/)
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .map((s) => (s.startsWith("-") ? s : `- ${s}`));
+
+  const n = Math.max(1, Math.floor(parts.length / 3));
+  const a = parts.slice(0, n);
+  const b = parts.slice(n, n * 2);
+  const c = parts.slice(n * 2);
+
+  return `DECISIONES:\n${a.join("\n") || "- (completar)"}\n\nAVANCES:\n${b.join("\n") || "- (completar)"}\n\nRIESGOS / ATRASOS:\n${c.join("\n") || "- (completar)"}`;
 }
 
 export default function Home() {
@@ -395,9 +434,24 @@ ${compromisos || "(Sin compromisos cargados)"}`;
           <textarea className="input" style={{ width: "100%", minHeight: 80 }} value={contexto} onChange={(e) => setContexto(e.target.value)} />
           <textarea className="input" style={{ width: "100%", minHeight: 180, marginTop: 8 }} placeholder="Pega aquí la transcripción..." value={transcript} onChange={(e) => setTranscript(e.target.value)} />
           <textarea className="input" style={{ width: "100%", minHeight: 220, marginTop: 8 }} value={prompt} readOnly />
-          <a className="btn secondary" href={`data:text/plain;charset=utf-8,${encodeURIComponent(prompt)}`} download="prompt_resumen_acta.txt">
-            Descargar prompt
-          </a>
+          <div className="row">
+            <button
+              className="btn ghost"
+              onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText(prompt);
+                  alert("Prompt copiado ✅");
+                } catch {
+                  alert("No se pudo copiar automáticamente");
+                }
+              }}
+            >
+              Copiar prompt
+            </button>
+            <a className="btn secondary" href={`data:text/plain;charset=utf-8,${encodeURIComponent(prompt)}`} download="prompt_resumen_acta.txt">
+              Descargar prompt
+            </a>
+          </div>
         </div>
       )}
 
@@ -448,7 +502,13 @@ ${compromisos || "(Sin compromisos cargados)"}`;
             <span>Word acta final: {wordTemplateName || "(no cargada aún)"}</span>
           </div>
           <textarea className="input" style={{ width: "100%", minHeight: 90, marginTop: 8 }} placeholder="Resumen ejecutivo" value={resumenEjecutivo} onChange={(e) => setResumenEjecutivo(e.target.value)} />
+          <div className="row" style={{ marginTop: 8 }}>
+            <button className="btn ghost" onClick={() => setResumenReunion(normalizeMeetingText(resumenReunion))}>
+              Formatear automáticamente (Decisiones/Avances/Riesgos)
+            </button>
+          </div>
           <textarea className="input" style={{ width: "100%", minHeight: 140, marginTop: 8 }} placeholder="Decisiones/avances/riesgos" value={resumenReunion} onChange={(e) => setResumenReunion(e.target.value)} />
+          <p className="small">Formato recomendado: DECISIONES / AVANCES / RIESGOS con viñetas.</p>
           <textarea className="input" style={{ width: "100%", minHeight: 260, marginTop: 8 }} value={actaMd} readOnly />
           <div className="row">
             <a className="btn secondary" href={`data:text/markdown;charset=utf-8,${encodeURIComponent(actaMd)}`} download={`acta_${actaNo || "hoy"}.md`}>
