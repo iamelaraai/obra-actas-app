@@ -251,7 +251,7 @@ ${compromisos || "(Sin compromisos cargados)"}`;
 
   const exportActaDocx = async () => {
     if (!wordTemplateFile) {
-      alert("Primero carga la plantilla Word (.docx)");
+      alert("Primero carga la plantilla Word (.docx) en la pestaña 3");
       return;
     }
     setExportingDocx(true);
@@ -280,7 +280,10 @@ ${compromisos || "(Sin compromisos cargados)"}`;
       fd.append("payload", JSON.stringify(payload));
 
       const res = await fetch("/api/generar-acta-docx", { method: "POST", body: fd });
-      if (!res.ok) throw new Error("No se pudo generar el acta .docx");
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        throw new Error(j?.detail || j?.error || "No se pudo generar el acta .docx");
+      }
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -288,8 +291,8 @@ ${compromisos || "(Sin compromisos cargados)"}`;
       a.download = `acta_${actaNo || "hoy"}.docx`;
       a.click();
       URL.revokeObjectURL(url);
-    } catch {
-      alert("Error generando acta .docx");
+    } catch (e: any) {
+      alert(`Error generando acta .docx: ${e?.message || e}`);
     } finally {
       setExportingDocx(false);
     }
@@ -405,31 +408,6 @@ ${compromisos || "(Sin compromisos cargados)"}`;
             )}
           </div>
 
-          <div className="row" style={{ marginBottom: 8 }}>
-            <label className="small">Plantilla Excel actividades: </label>
-            <input
-              type="file"
-              className="input"
-              accept=".xlsx,.xlsm"
-              onChange={(e) => setExcelTemplateName(e.target.files?.[0]?.name || "")}
-            />
-            {excelTemplateName && <span className="small">Cargada: {excelTemplateName}</span>}
-          </div>
-
-          <div className="row" style={{ marginBottom: 8 }}>
-            <label className="small">Plantilla Word acta final: </label>
-            <input
-              type="file"
-              className="input"
-              accept=".docx"
-              onChange={(e) => {
-                const f = e.target.files?.[0] || null;
-                setWordTemplateFile(f);
-                setWordTemplateName(f?.name || "");
-              }}
-            />
-            {wordTemplateName && <span className="small">Cargada: {wordTemplateName}</span>}
-          </div>
 
           <textarea className="input" style={{ width: "100%", minHeight: 80 }} value={contexto} onChange={(e) => setContexto(e.target.value)} />
           <textarea className="input" style={{ width: "100%", minHeight: 180, marginTop: 8 }} placeholder="Pega aquí la transcripción..." value={transcript} onChange={(e) => setTranscript(e.target.value)} />
@@ -465,6 +443,18 @@ ${compromisos || "(Sin compromisos cargados)"}`;
             <input className="input" placeholder="Lugar" value={lugar} onChange={(e) => setLugar(e.target.value)} />
             <input className="input" placeholder="Hora inicio" value={horaInicio} onChange={(e) => setHoraInicio(e.target.value)} />
             <input className="input" placeholder="Hora fin" value={horaFin} onChange={(e) => setHoraFin(e.target.value)} />
+          </div>
+
+          <div className="row" style={{ marginTop: 8 }}>
+            <label className="small">Excel actividades:</label>
+            <input type="file" className="input" accept=".xlsx,.xlsm" onChange={(e)=>setExcelTemplateName(e.target.files?.[0]?.name || "")} />
+            <span className="small">{excelTemplateName || "(sin cargar)"}</span>
+          </div>
+
+          <div className="row" style={{ marginTop: 8 }}>
+            <label className="small">Plantilla Word acta final (.docx):</label>
+            <input type="file" className="input" accept=".docx" onChange={(e)=>{const f=e.target.files?.[0]||null; setWordTemplateFile(f); setWordTemplateName(f?.name||"");}} />
+            <span className="small">{wordTemplateName || "(sin cargar)"}</span>
           </div>
 
           <div className="card" style={{ marginTop: 8 }}>
