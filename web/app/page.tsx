@@ -47,10 +47,12 @@ export default function Home() {
   const [tab, setTab] = useState<"t1" | "t2" | "t3">("t1");
   const [autoObs, setAutoObs] = useState(false);
   const [estilo, setEstilo] = useState<(typeof ESTILOS)[number]>("Interventoría formal");
+  const todayISO = new Date().toISOString().slice(0, 10);
+
   const [rows, setRows] = useState<Row[]>([
     {
       actaNo: "19",
-      fechaComite: new Date().toLocaleDateString("es-CO"),
+      fechaComite: todayISO,
       actor: "EDU",
       compromiso: "",
       componente: "Técnico",
@@ -64,10 +66,13 @@ export default function Home() {
 
   const [contexto, setContexto] = useState("Proyecto: Parque Primavera Norte. Documento: acta de comité de obra.");
   const [transcript, setTranscript] = useState("");
+  const [audioTranscripcionUrl, setAudioTranscripcionUrl] = useState("");
+  const [excelTemplateName, setExcelTemplateName] = useState<string>("");
+  const [wordTemplateName, setWordTemplateName] = useState<string>("");
 
   const [proyecto, setProyecto] = useState("Parque Primavera Norte");
   const [actaNo, setActaNo] = useState("19");
-  const [fecha, setFecha] = useState(new Date().toLocaleDateString("es-CO"));
+  const [fecha, setFecha] = useState(todayISO);
   const [lugar, setLugar] = useState("Campamento de obra");
   const [horaInicio, setHoraInicio] = useState("09:30 AM");
   const [horaFin, setHoraFin] = useState("11:30 AM");
@@ -141,8 +146,13 @@ ${compromisos || "(Sin compromisos cargados)"}`;
 
   return (
     <div className="wrap">
-      <h1>Obra Actas — Web (Next.js/Vercel prototype)</h1>
+      <h1 className="title">📋 Obra Actas — Web</h1>
       <p className="small">Validación web: edición estable + transcripción + acta completa (MVP).</p>
+      <div className="row" style={{ marginBottom: 10 }}>
+        <span className="pill">Next.js</span>
+        <span className="pill">Vercel-ready</span>
+        <span className="pill">MVP</span>
+      </div>
 
       <div className="card row">
         <button className="btn" onClick={() => setTab("t1")}>1) Compromisos</button>
@@ -175,7 +185,7 @@ ${compromisos || "(Sin compromisos cargados)"}`;
                 {rows.map((r, i) => (
                   <tr key={i}>
                     <td><input className="input" value={r.actaNo} onChange={(e) => update(i, "actaNo", e.target.value)} /></td>
-                    <td><input className="input" value={r.fechaComite} onChange={(e) => update(i, "fechaComite", e.target.value)} /></td>
+                    <td><input type="date" className="input" value={r.fechaComite} onChange={(e) => update(i, "fechaComite", e.target.value)} /></td>
                     <td>
                       <select className="input" value={r.actor} onChange={(e) => update(i, "actor", e.target.value)}>
                         <option>EDU</option><option>Contratista</option><option>Interventoría</option>
@@ -210,6 +220,44 @@ ${compromisos || "(Sin compromisos cargados)"}`;
         <div className="card">
           <h3>Transcripción y resumen (prompt maestro)</h3>
           <p className="small">Pega transcript de reunión y úsalo en Claude/Codex/ChatGPT.</p>
+
+          <div className="row" style={{ marginBottom: 8 }}>
+            <input
+              className="input"
+              style={{ minWidth: 320 }}
+              placeholder="Link de transcripción/audio"
+              value={audioTranscripcionUrl}
+              onChange={(e) => setAudioTranscripcionUrl(e.target.value)}
+            />
+            {audioTranscripcionUrl && (
+              <a className="btn ghost" href={audioTranscripcionUrl} target="_blank" rel="noreferrer">
+                Ir a transcripción/audio
+              </a>
+            )}
+          </div>
+
+          <div className="row" style={{ marginBottom: 8 }}>
+            <label className="small">Plantilla Excel actividades: </label>
+            <input
+              type="file"
+              className="input"
+              accept=".xlsx,.xlsm"
+              onChange={(e) => setExcelTemplateName(e.target.files?.[0]?.name || "")}
+            />
+            {excelTemplateName && <span className="small">Cargada: {excelTemplateName}</span>}
+          </div>
+
+          <div className="row" style={{ marginBottom: 8 }}>
+            <label className="small">Plantilla Word acta final: </label>
+            <input
+              type="file"
+              className="input"
+              accept=".docx"
+              onChange={(e) => setWordTemplateName(e.target.files?.[0]?.name || "")}
+            />
+            {wordTemplateName && <span className="small">Cargada: {wordTemplateName}</span>}
+          </div>
+
           <textarea className="input" style={{ width: "100%", minHeight: 80 }} value={contexto} onChange={(e) => setContexto(e.target.value)} />
           <textarea className="input" style={{ width: "100%", minHeight: 180, marginTop: 8 }} placeholder="Pega aquí la transcripción..." value={transcript} onChange={(e) => setTranscript(e.target.value)} />
           <textarea className="input" style={{ width: "100%", minHeight: 220, marginTop: 8 }} value={prompt} readOnly />
@@ -225,10 +273,14 @@ ${compromisos || "(Sin compromisos cargados)"}`;
           <div className="row">
             <input className="input" placeholder="Proyecto" value={proyecto} onChange={(e) => setProyecto(e.target.value)} />
             <input className="input" placeholder="No. Acta" value={actaNo} onChange={(e) => setActaNo(e.target.value)} />
-            <input className="input" placeholder="Fecha" value={fecha} onChange={(e) => setFecha(e.target.value)} />
+            <input type="date" className="input" placeholder="Fecha" value={fecha} onChange={(e) => setFecha(e.target.value)} />
             <input className="input" placeholder="Lugar" value={lugar} onChange={(e) => setLugar(e.target.value)} />
             <input className="input" placeholder="Hora inicio" value={horaInicio} onChange={(e) => setHoraInicio(e.target.value)} />
             <input className="input" placeholder="Hora fin" value={horaFin} onChange={(e) => setHoraFin(e.target.value)} />
+          </div>
+          <div className="row small" style={{ marginTop: 8 }}>
+            <span>Excel actividades: {excelTemplateName || "(no cargada aún)"}</span>
+            <span>Word acta final: {wordTemplateName || "(no cargada aún)"}</span>
           </div>
           <textarea className="input" style={{ width: "100%", minHeight: 90, marginTop: 8 }} placeholder="Resumen ejecutivo" value={resumenEjecutivo} onChange={(e) => setResumenEjecutivo(e.target.value)} />
           <textarea className="input" style={{ width: "100%", minHeight: 140, marginTop: 8 }} placeholder="Decisiones/avances/riesgos" value={resumenReunion} onChange={(e) => setResumenReunion(e.target.value)} />
