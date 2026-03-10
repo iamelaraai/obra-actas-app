@@ -6,6 +6,7 @@ import pandas as pd
 import streamlit as st
 from docx import Document
 from openpyxl import load_workbook
+from openpyxl.styles import PatternFill
 
 st.set_page_config(page_title="Actas de Obra - Generador", page_icon="📋", layout="wide")
 
@@ -266,7 +267,7 @@ def to_xlsx_bytes(df: pd.DataFrame, sheet_name: str = "compromisos"):
 
 
 def to_official_template_bytes(template_file, df_simple: pd.DataFrame, sheet_name: str = "Acta 19"):
-    """Rellena plantilla oficial sin romper formato (colores, bordes, anchos)."""
+    """Rellena plantilla oficial sin romper formato y colorea FECHA/COMENTARIOS por estado."""
     wb = load_workbook(template_file)
     if sheet_name not in wb.sheetnames:
         sheet_name = wb.sheetnames[-1]
@@ -275,28 +276,61 @@ def to_official_template_bytes(template_file, df_simple: pd.DataFrame, sheet_nam
     # Limpia rango de datos (filas de compromisos) en columnas B:F, H:L, N:R
     for row in range(4, 220):
         for col in [2, 3, 4, 5, 6, 8, 9, 10, 11, 12, 14, 15, 16, 17, 18]:
-            ws.cell(row=row, column=col).value = None
+            cell = ws.cell(row=row, column=col)
+            cell.value = None
+            # limpiamos relleno solo en columna fecha/comentarios de cada bloque
+            if col in [5, 11, 17]:
+                cell.fill = PatternFill(fill_type=None)
 
-    # Mapeo de actor -> columna base
+    # Mapeo por responsable/actor -> columna base
     base_cols = {
-        "EDU": 2,           # B
-        "Contratista": 8,   # H
-        "Interventoría": 14 # N
+        "edu": 2,            # B
+        "contratista": 8,    # H
+        "interventoría": 14, # N
+        "interventoria": 14,
     }
 
-    for actor, base in base_cols.items():
-        sub = df_simple[df_simple["Actor"].astype(str).str.strip() == actor].reset_index(drop=True)
-        for i, (_, r) in enumerate(sub.iterrows(), start=4):
-            ws.cell(row=i, column=base).value = clean_text(r.get("Compromiso", ""))
-            ws.cell(row=i, column=base + 1).value = clean_text(r.get("Componente", ""))
-            ws.cell(row=i, column=base + 2).value = clean_text(r.get("Responsable", ""))
+    # Colores de estado (como en tu ejemplo)
+    estado_fill = {
+        "cumplido": PatternFill(fill_type="solid", start_color="92D050", end_color="92D050"),
+        "en proceso": PatternFill(fill_type="solid", start_color="FFFF00", end_color="FFFF00"),
+        "cumplido parcialmente": PatternFill(fill_type="solid", start_color="FFFF00", end_color="FFFF00"),
+        "pendiente por definir": PatternFill(fill_type="solid", start_color="FFFF00", end_color="FFFF00"),
+        "no cumplido": PatternFill(fill_type="solid", start_color="FF0000", end_color="FF0000"),
+    }
 
-            fecha = clean_text(r.get("Fecha límite", ""))
-            estado = clean_text(r.get("Estado", ""))
-            fc = "\n".join([x for x in [fecha, estado] if x])
-            ws.cell(row=i, column=base + 3).value = fc
+    # contador de fila por bloque para que cada columna tenga sus propios renglones
+    next_row = {2: 4, 8: 4, 14: 4}
 
-            ws.cell(row=i, column=base + 4).value = clean_text(r.get("Observación seguimiento", ""))
+    for _, r in df_simple.iterrows():
+        responsable = clean_text(r.get("Responsable", "")).lower()
+        actor = clean_text(r.get("Actor", "")).lower()
+
+        # prioridad: responsable; fallback: actor
+        base = base_cols.get(responsable) or base_cols.get(actor)
+        if not base:
+            # si viene raro, se manda a EDU para no perder el dato
+            base = 2
+
+        row_i = next_row[base]
+        next_row[base] += 1
+
+        ws.cell(row=row_i, column=base).value = clean_text(r.get("Compromiso", ""))
+        ws.cell(row=row_i, column=base + 1).value = clean_text(r.get("Componente", ""))
+        ws.cell(row=row_i, column=base + 2).value = clean_text(r.get("Responsable", ""))
+
+        fecha = clean_text(r.get("Fecha límite", ""))
+        estado = clean_text(r.get("Estado", ""))
+        fc = "\n".join([x for x in [fecha, estado] if x])
+
+        fc_cell = ws.cell(row=row_i, column=base + 3)
+        fc_cell.value = fc
+
+        fill = estado_fill.get(estado.lower())
+        if fill:
+            fc_cell.fill = fill
+
+        ws.cell(row=row_i, column=base + 4).value = clean_text(r.get("Observación seguimiento", ""))
 
     out = io.BytesIO()
     wb.save(out)
