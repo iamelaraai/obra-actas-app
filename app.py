@@ -372,6 +372,7 @@ with tab0:
         "Responsable",
         "Fecha límite",
         "Estado",
+        "Notas rápidas",
         "Observación seguimiento",
     ]
     if "captura_df" not in st.session_state:
@@ -386,12 +387,12 @@ with tab0:
                     "Responsable": "",
                     "Fecha límite": "",
                     "Estado": "En proceso",
+                    "Notas rápidas": "",
                     "Observación seguimiento": "",
                 }
             ]
         )
 
-    # sincroniza metadatos por defecto en filas vacías
     base_df = st.session_state["captura_df"].copy()
     for col in base_cols:
         if col not in base_df.columns:
@@ -399,6 +400,8 @@ with tab0:
     base_df = base_df[base_cols]
     base_df.loc[base_df["Acta No"].astype(str).str.strip() == "", "Acta No"] = acta_no_form
     base_df.loc[base_df["Fecha comité"].astype(str).str.strip() == "", "Fecha comité"] = fecha_form
+
+    auto_obs = st.toggle("Autopoblar observaciones desde Estado + Notas rápidas", value=True)
 
     edited_df = st.data_editor(
         base_df,
@@ -411,18 +414,36 @@ with tab0:
         },
     )
 
-    st.caption("💾 Autosave activo: los cambios de la tabla se guardan automáticamente.")
+    st.caption("💾 Autosave activo: los cambios se guardan automáticamente.")
 
-    # Autosave robusto: guarda en cada render válido del editor
-    if isinstance(edited_df, pd.DataFrame) and set(base_cols).issubset(set(edited_df.columns)):
-        current = edited_df[base_cols].copy()
-        prev = st.session_state.get("captura_df")
-        if prev is None or not isinstance(prev, pd.DataFrame) or not current.equals(prev[base_cols] if set(base_cols).issubset(set(prev.columns)) else prev):
+    current = edited_df[base_cols].copy() if isinstance(edited_df, pd.DataFrame) else base_df.copy()
+
+    if auto_obs and not current.empty:
+        changed = False
+        for i, r in current.iterrows():
+            comp = clean_text(r.get("Compromiso", ""))
+            estado = clean_text(r.get("Estado", ""))
+            notas = clean_text(r.get("Notas rápidas", ""))
+            obs = clean_text(r.get("Observación seguimiento", ""))
+            if comp and estado and notas and (not obs or obs.startswith("Desde ") or obs.startswith("Compromiso ")):
+                nueva = generar_observacion_breve(
+                    estado,
+                    clean_text(r.get("Actor", "")),
+                    comp,
+                    notas,
+                    "Interventoría formal",
+                )
+                if nueva != obs:
+                    current.at[i, "Observación seguimiento"] = nueva
+                    changed = True
+        if changed:
             st.session_state["captura_df"] = current
+            st.rerun()
 
-    # Tabla visible (sin filtrar) y tabla procesada (solo filas con compromiso)
-    captura_df_visible = st.session_state["captura_df"].copy()
-    captura_df = captura_df_visible[captura_df_visible["Compromiso"].astype(str).str.strip() != ""].copy()
+    st.session_state["captura_df"] = current
+
+    # Tabla procesada (solo filas con compromiso)
+    captura_df = current[current["Compromiso"].astype(str).str.strip() != ""].copy()
 
     if not captura_df.empty:
         captura_df.insert(
