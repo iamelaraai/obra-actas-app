@@ -193,12 +193,46 @@ Devuelve SOLO con esta estructura:
 """
 
 
-def generar_observacion_breve(estado: str, actor: str, compromiso: str, notas: str):
+def generar_observacion_breve(estado: str, actor: str, compromiso: str, notas: str, estilo: str = "Interventoría formal"):
     est = (estado or "").strip().lower()
     actor_txt = actor or "El responsable"
     c = clean_text(compromiso)
     n = clean_text(notas)
 
+    if estilo == "Ejecutivo corto":
+        if est == "cumplido":
+            return f"Compromiso cumplido por {actor_txt}. {n}".strip()
+        if est == "no cumplido":
+            return f"Compromiso no cumplido por {actor_txt}. {n} Se reprograma seguimiento.".strip()
+        if est == "cumplido parcialmente":
+            return f"Cumplimiento parcial por {actor_txt}. {n}".strip()
+        if est == "en proceso":
+            return f"Compromiso en proceso por {actor_txt}. {n}".strip()
+        return f"Estado pendiente de confirmar. {n}".strip()
+
+    if estilo == "Operativo campo":
+        if est == "cumplido":
+            return f"{actor_txt} reporta ejecución completa del compromiso: {c}. Evidencia/nota: {n or 'sin novedad'}"
+        if est == "no cumplido":
+            return f"{actor_txt} reporta no cumplimiento del compromiso: {c}. Causa/nota: {n or 'pendiente información'}. Acción: reprogramar y hacer seguimiento en próximo comité."
+        if est == "cumplido parcialmente":
+            return f"{actor_txt} reporta avance parcial del compromiso: {c}. Avance: {n or 'sin detalle'}. Acción: completar pendiente y validar cierre."
+        if est == "en proceso":
+            return f"{actor_txt} reporta compromiso en ejecución: {c}. Estado actual: {n or 'en curso'}. Acción: mantener seguimiento."
+        return f"{actor_txt} reporta novedad sobre compromiso: {c}. Nota: {n or 'sin detalle'}."
+
+    if estilo == "Neutro estándar":
+        if est == "cumplido":
+            return f"{actor_txt} informa cumplimiento del compromiso: {c}. {('Detalle: ' + n) if n else ''}".strip()
+        if est == "no cumplido":
+            return f"{actor_txt} informa no cumplimiento del compromiso: {c}. {('Detalle: ' + n) if n else ''} Se traslada seguimiento.".strip()
+        if est == "cumplido parcialmente":
+            return f"{actor_txt} informa cumplimiento parcial del compromiso: {c}. {('Detalle: ' + n) if n else ''}".strip()
+        if est == "en proceso":
+            return f"{actor_txt} informa que el compromiso está en proceso: {c}. {('Detalle: ' + n) if n else ''}".strip()
+        return f"Observación sobre el compromiso '{c}': {n}" if n else f"Observación pendiente de completar para el compromiso: {c}."
+
+    # Interventoría formal (default)
     if est == "cumplido":
         base = f"Desde {actor_txt} se informa que se dio cumplimiento al compromiso: {c}."
         extra = f" Se deja como soporte: {n}." if n else ""
@@ -312,6 +346,11 @@ with tab0:
             idx = st.selectbox("Selecciona compromiso", options=list(captura_df.index), format_func=lambda i: f"{captura_df.loc[i, 'Actor']} · {str(captura_df.loc[i, 'Compromiso'])[:80]}")
             est_sel = st.selectbox("Estado para redactar", options=ESTADOS, index=max(ESTADOS.index(captura_df.loc[idx, 'Estado']) if captura_df.loc[idx, 'Estado'] in ESTADOS else 1, 0))
         with rx2:
+            estilo_sel = st.selectbox(
+                "Estilo de redacción",
+                ["Interventoría formal", "Ejecutivo corto", "Operativo campo", "Neutro estándar"],
+                index=0,
+            )
             notas_cortas = st.text_area("Notas rápidas (2-10 palabras)", placeholder="ej: pendiente respuesta de SIF sobre alcance de red", height=90)
 
         obs_generada = generar_observacion_breve(
@@ -319,6 +358,7 @@ with tab0:
             str(captura_df.loc[idx, "Actor"]),
             str(captura_df.loc[idx, "Compromiso"]),
             notas_cortas,
+            estilo_sel,
         )
         st.text_area("Observación sugerida", value=obs_generada, height=110)
 
