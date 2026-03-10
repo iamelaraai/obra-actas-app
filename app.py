@@ -22,12 +22,10 @@ def parse_fecha_estado(raw: str):
     if not txt:
         return "", "", txt
 
-    # ejemplos: "9/03/2026\nNo Cumplido" o serial excel
     lines = [x.strip() for x in re.split(r"\n|\r", txt) if x.strip()]
     fecha, estado = "", ""
 
     if lines:
-        # intento fecha tipo dd/mm/yyyy
         m = re.search(r"\b(\d{1,2}/\d{1,2}/\d{2,4})\b", lines[0])
         if m:
             fecha = m.group(1)
@@ -43,14 +41,13 @@ def parse_fecha_estado(raw: str):
 
 def extract_block(df: pd.DataFrame, actor: str, c_comp: int, c_compo: int, c_resp: int, c_fc: int, c_obs: int):
     rows = []
-    for i, row in df.iterrows():
+    for _, row in df.iterrows():
         compromiso = clean_text(row.iloc[c_comp]) if c_comp < len(row) else ""
         componente = clean_text(row.iloc[c_compo]) if c_compo < len(row) else ""
         responsable = clean_text(row.iloc[c_resp]) if c_resp < len(row) else ""
         fecha_raw = clean_text(row.iloc[c_fc]) if c_fc < len(row) else ""
         observ = clean_text(row.iloc[c_obs]) if c_obs < len(row) else ""
 
-        # regla: solo fila válida si tiene compromiso real
         if not compromiso:
             continue
 
@@ -72,10 +69,6 @@ def extract_block(df: pd.DataFrame, actor: str, c_comp: int, c_compo: int, c_res
 
 
 def parse_sheet(df: pd.DataFrame, acta_no: str, fecha_comite: str):
-    # Mapeo según estructura observada:
-    # EDU: B-F -> idx 1..5
-    # Contratista: H-L -> idx 7..11
-    # Interventoría: N-R -> idx 13..17
     blocks = []
     blocks += extract_block(df, "EDU", 1, 2, 3, 4, 5)
     blocks += extract_block(df, "Contratista", 7, 8, 9, 10, 11)
@@ -87,14 +80,7 @@ def parse_sheet(df: pd.DataFrame, acta_no: str, fecha_comite: str):
 
     out.insert(0, "Acta No", acta_no)
     out.insert(1, "Fecha comité", fecha_comite)
-
-    # ID amigable
-    out.insert(
-        2,
-        "ID compromiso",
-        [f"A{acta_no}-{a[:3].upper()}-{str(i+1).zfill(3)}" for i, a in enumerate(out["Actor"].tolist())],
-    )
-
+    out.insert(2, "ID compromiso", [f"A{acta_no}-{a[:3].upper()}-{str(i+1).zfill(3)}" for i, a in enumerate(out["Actor"].tolist())])
     return out
 
 
@@ -103,10 +89,7 @@ def build_summary(df: pd.DataFrame):
     by_estado = df["Estado"].fillna("").value_counts(dropna=False).to_dict()
     by_actor = df["Actor"].value_counts(dropna=False).to_dict()
 
-    lines = [
-        f"Total compromisos: {total}",
-        "\nPor actor:",
-    ]
+    lines = [f"Total compromisos: {total}", "\nPor actor:"]
     for k, v in by_actor.items():
         lines.append(f"- {k}: {v}")
 
@@ -156,80 +139,124 @@ def to_docx(texto: str):
     return bio
 
 
-st.title("📋 Generador de Actas de Obra (teach-friendly)")
-st.caption("Convierte la hoja de compromisos en una sección de acta lista para Word/PDF.")
+def build_transcript_prompt(transcript: str, contexto: str):
+    return f"""Eres asistente de interventoría de obra. Redacta sección de acta en español formal y técnico.
 
-with st.expander("Cómo usar (rápido)", expanded=True):
-    st.markdown(
-        """
-1. Sube el archivo Excel de compromisos.
+Contexto del proyecto:
+{contexto}
+
+Transcripción de reunión:
+{transcript}
+
+Devuelve SOLO con esta estructura:
+1) Decisiones tomadas
+2) Avances reportados
+3) Riesgos y atrasos críticos
+4) Compromisos nuevos (tabla en markdown con: compromiso, responsable, fecha límite, componente)
+5) Observaciones de cierre
+"""
+
+
+st.title("📋 Generador de Actas de Obra (teach-friendly)")
+st.caption("Excel → compromisos normalizados → sección de acta Word/PDF + apoyo de transcripción")
+
+tab1, tab2 = st.tabs(["1) Compromisos desde Excel", "2) Transcripción y resumen (v2)"])
+
+with tab1:
+    with st.expander("Cómo usar (rápido)", expanded=True):
+        st.markdown(
+            """
+1. Sube el Excel de compromisos.
 2. Elige la pestaña (por ejemplo, `Acta 19`).
 3. Revisa/edita estados y observaciones en la tabla.
 4. Descarga:
    - Base normalizada (CSV)
    - Texto de acta (Markdown)
    - Word (.docx)
-        """
-    )
-
-archivo = st.file_uploader("Sube el Excel de compromisos", type=["xlsx", "xlsm", "xlsb"])
-
-if archivo is not None:
-    xls = pd.ExcelFile(archivo)
-    sheet = st.selectbox("Pestaña", xls.sheet_names, index=max(len(xls.sheet_names)-1, 0))
-
-    c1, c2 = st.columns(2)
-    with c1:
-        acta_no = st.text_input("Acta No", value=re.sub(r"\D", "", sheet) or "")
-    with c2:
-        fecha_comite = st.text_input("Fecha comité", value=datetime.now().strftime("%d/%m/%Y"))
-
-    raw = pd.read_excel(archivo, sheet_name=sheet, header=None)
-    data = parse_sheet(raw, acta_no=acta_no or "", fecha_comite=fecha_comite)
-
-    if data.empty:
-        st.warning("No se detectaron compromisos con la estructura esperada en esta pestaña.")
-    else:
-        st.subheader("Tabla normalizada (editable)")
-        editable = st.data_editor(
-            data,
-            use_container_width=True,
-            num_rows="dynamic",
-            column_config={
-                "Estado": st.column_config.SelectboxColumn("Estado", options=[""] + ESTADOS),
-            },
+            """
         )
 
-        st.subheader("Resumen")
-        st.text(build_summary(editable))
+    archivo = st.file_uploader("Sube el Excel de compromisos", type=["xlsx", "xlsm", "xlsb"], key="excel")
 
-        texto_acta = build_acta_text(editable)
+    if archivo is not None:
+        xls = pd.ExcelFile(archivo)
+        sheet = st.selectbox("Pestaña", xls.sheet_names, index=max(len(xls.sheet_names) - 1, 0))
 
-        st.subheader("Texto para acta")
-        st.text_area("Sección de compromisos (puedes copiar/pegar en Word)", value=texto_acta, height=300)
+        c1, c2 = st.columns(2)
+        with c1:
+            acta_no = st.text_input("Acta No", value=re.sub(r"\D", "", sheet) or "")
+        with c2:
+            fecha_comite = st.text_input("Fecha comité", value=datetime.now().strftime("%d/%m/%Y"))
 
-        c3, c4, c5 = st.columns(3)
-        with c3:
-            st.download_button(
-                "⬇️ Descargar CSV normalizado",
-                data=editable.to_csv(index=False).encode("utf-8"),
-                file_name=f"compromisos_acta_{acta_no or sheet}.csv",
-                mime="text/csv",
+        raw = pd.read_excel(archivo, sheet_name=sheet, header=None)
+        data = parse_sheet(raw, acta_no=acta_no or "", fecha_comite=fecha_comite)
+
+        if data.empty:
+            st.warning("No se detectaron compromisos con la estructura esperada en esta pestaña.")
+        else:
+            st.subheader("Tabla normalizada (editable)")
+            editable = st.data_editor(
+                data,
+                use_container_width=True,
+                num_rows="dynamic",
+                column_config={"Estado": st.column_config.SelectboxColumn("Estado", options=[""] + ESTADOS)},
             )
-        with c4:
-            st.download_button(
-                "⬇️ Descargar Markdown",
-                data=texto_acta.encode("utf-8"),
-                file_name=f"seccion_compromisos_acta_{acta_no or sheet}.md",
-                mime="text/markdown",
-            )
-        with c5:
-            st.download_button(
-                "⬇️ Descargar Word (.docx)",
-                data=to_docx(texto_acta),
-                file_name=f"seccion_compromisos_acta_{acta_no or sheet}.docx",
-                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-            )
+
+            st.subheader("Resumen")
+            st.text(build_summary(editable))
+
+            texto_acta = build_acta_text(editable)
+
+            st.subheader("Texto para acta")
+            st.text_area("Sección de compromisos (copiar/pegar en Word)", value=texto_acta, height=300)
+
+            c3, c4, c5 = st.columns(3)
+            with c3:
+                st.download_button(
+                    "⬇️ Descargar CSV normalizado",
+                    data=editable.to_csv(index=False).encode("utf-8"),
+                    file_name=f"compromisos_acta_{acta_no or sheet}.csv",
+                    mime="text/csv",
+                )
+            with c4:
+                st.download_button(
+                    "⬇️ Descargar Markdown",
+                    data=texto_acta.encode("utf-8"),
+                    file_name=f"seccion_compromisos_acta_{acta_no or sheet}.md",
+                    mime="text/markdown",
+                )
+            with c5:
+                st.download_button(
+                    "⬇️ Descargar Word (.docx)",
+                    data=to_docx(texto_acta),
+                    file_name=f"seccion_compromisos_acta_{acta_no or sheet}.docx",
+                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                )
+
+with tab2:
+    st.markdown("### Asistente para reuniones (sin API obligatoria)")
+    st.caption("Pega transcripción y la app te arma un prompt maestro para usar en Claude/Codex/ChatGPT.")
+
+    contexto = st.text_area(
+        "Contexto del proyecto",
+        value="Proyecto: Parque Primavera Norte. Documento: acta de comité de obra.",
+        height=80,
+    )
+    transcript = st.text_area("Transcripción de reunión", height=240, placeholder="Pega aquí la transcripción...")
+
+    if transcript.strip():
+        prompt = build_transcript_prompt(transcript.strip(), contexto.strip())
+        st.subheader("Prompt listo para IA")
+        st.code(prompt, language="markdown")
+
+        st.download_button(
+            "⬇️ Descargar prompt (.txt)",
+            data=prompt.encode("utf-8"),
+            file_name="prompt_resumen_acta.txt",
+            mime="text/plain",
+        )
+
+        st.info("Tip: usa este prompt en Claude/Codex y pega el resultado en el acta. Luego cruza compromisos nuevos con la tabla del Tab 1.")
 
 st.divider()
-st.caption("Siguiente paso sugerido: conectar transcripción de reunión para pre-redactar observaciones automáticamente.")
+st.caption("Próximo paso: v3 con generación de acta completa desde plantilla oficial (.docx).")
