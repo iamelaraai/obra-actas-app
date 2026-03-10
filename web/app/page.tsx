@@ -173,6 +173,11 @@ export default function Home() {
   const namesByEntidad = (entidad: Asistente["entidad"]) =>
     asistentesCatalogo.filter((a) => a.entidad === entidad).map((a) => a.nombre);
 
+  const selectedDetails = (entidad: Asistente["entidad"], selected: string[]) =>
+    asistentesCatalogo
+      .filter((a) => a.entidad === entidad && selected.includes(a.nombre))
+      .map((a) => ({ nombre: a.nombre, cargo: a.cargo }));
+
   const asistentesTotal = selSIF.length + selEDU.length + selINT.length + selCON.length;
 
   const actaMd = useMemo(() => {
@@ -270,6 +275,10 @@ ${compromisos || "(Sin compromisos cargados)"}`;
           edu: selEDU,
           interventoria: selINT,
           contratista: selCON,
+          sif_det: selectedDetails("SIF", selSIF),
+          edu_det: selectedDetails("EDU", selEDU),
+          interventoria_det: selectedDetails("Interventoría", selINT),
+          contratista_det: selectedDetails("Contratista", selCON),
         },
         resumenReunion: resumenReunion || resumenEjecutivo,
         rows: rows.filter((r) => r.compromiso.trim()),

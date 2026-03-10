@@ -13,6 +13,8 @@ type Row = {
   observacion?: string;
 };
 
+type Asis = { nombre: string; cargo?: string };
+
 function esc(s: string) {
   return s
     .replaceAll("&", "&amp;")
@@ -27,25 +29,34 @@ function toWordInline(text: string) {
   return safe.replace(/\n/g, "</w:t><w:br/><w:t>");
 }
 
-function asistLines(title: string, names: string[]) {
-  const header = `${title}\nNOMBRE\tCARGO`;
-  if (!names.length) return `${header}\n(Sin selección)`;
-  return `${header}\n` + names.map((n) => `${n}\t`).join("\n");
+function tableCell(text: string, bold = false) {
+  return `<w:tc><w:tcPr><w:tcW w:w="2400" w:type="dxa"/></w:tcPr><w:p><w:r>${bold ? "<w:rPr><w:b/></w:rPr>" : ""}<w:t>${esc(text || "")}</w:t></w:r></w:p></w:tc>`;
 }
 
-function rowsTable(rows: Row[], title: string) {
-  const head = `${title}\nACTOR\tCOMPROMISO\tCOMPONENTE\tRESPONSABLE\tFECHA\tESTADO\tOBSERVACIÓN`;
-  if (!rows.length) return `${head}\n(Sin registros)`;
-  return (
-    head +
-    "\n" +
-    rows
-      .map(
-        (r) =>
-          `${r.actor || ""}\t${r.compromiso || ""}\t${r.componente || ""}\t${r.responsable || r.actor || ""}\t${r.fechaLimite || ""}\t${r.estado || ""}\t${r.observacion || ""}`
-      )
-      .join("\n")
-  );
+function buildTableXml(headers: string[], rows: string[][]) {
+  const borders = `<w:tblBorders>
+    <w:top w:val="single" w:sz="8" w:space="0" w:color="auto"/>
+    <w:left w:val="single" w:sz="8" w:space="0" w:color="auto"/>
+    <w:bottom w:val="single" w:sz="8" w:space="0" w:color="auto"/>
+    <w:right w:val="single" w:sz="8" w:space="0" w:color="auto"/>
+    <w:insideH w:val="single" w:sz="6" w:space="0" w:color="auto"/>
+    <w:insideV w:val="single" w:sz="6" w:space="0" w:color="auto"/>
+  </w:tblBorders>`;
+
+  const headRow = `<w:tr>${headers.map((h) => tableCell(h, true)).join("")}</w:tr>`;
+  const bodyRows = (rows.length ? rows : [["Sin registros", ...Array(Math.max(headers.length - 1, 0)).fill("")]])
+    .map((r) => `<w:tr>${headers.map((_, i) => tableCell(r[i] || "")).join("")}</w:tr>`)
+    .join("");
+
+  return `<w:tbl><w:tblPr><w:tblStyle w:val="TableGrid"/>${borders}</w:tblPr><w:tblGrid>${headers
+    .map(() => `<w:gridCol w:w="2400"/>`)
+    .join("")}</w:tblGrid>${headRow}${bodyRows}</w:tbl>`;
+}
+
+function replaceParagraphWithXml(xml: string, marker: string, replacementXml: string) {
+  const escaped = marker.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const regex = new RegExp(`<w:p[\\s\\S]*?${escaped}[\\s\\S]*?<\\/w:p>`, "g");
+  return xml.replace(regex, replacementXml);
 }
 
 export async function POST(req: Request) {
@@ -60,7 +71,16 @@ export async function POST(req: Request) {
 
     const payload = JSON.parse(payloadRaw) as {
       meta: Record<string, string>;
-      asistentes: { sif: string[]; edu: string[]; interventoria: string[]; contratista: string[] };
+      asistentes: {
+        sif: string[];
+        edu: string[];
+        interventoria: string[];
+        contratista: string[];
+        sif_det?: Asis[];
+        edu_det?: Asis[];
+        interventoria_det?: Asis[];
+        contratista_det?: Asis[];
+      };
       resumenReunion: string;
       rows: Row[];
     };
@@ -85,18 +105,54 @@ export async function POST(req: Request) {
       "{{hora_inicio}}": payload.meta.hora_inicio || "",
       "{{hora_fin}}": payload.meta.hora_fin || "",
       "{{asistentes_total}}": String(totalAsist),
-      "{{asistentes_sif}}": asistLines("Por la SIF", payload.asistentes.sif || []),
-      "{{asistentes_edu}}": asistLines("Por la EDU", payload.asistentes.edu || []),
-      "{{asistentes_interventoria}}": asistLines("Por la Interventoría", payload.asistentes.interventoria || []),
-      "{{asistentes_contratista}}": asistLines("Por la Empresa Contratista", payload.asistentes.contratista || []),
       "{{resumen_comite_tecnico}}": payload.resumenReunion || "",
-      "{{tabla_actividades}}": rowsTable(payload.rows || [], "ACTIVIDADES / COMPROMISOS"),
-      "{{tabla_compromisos}}": rowsTable(payload.rows || [], "COMPROMISOS, COMENTARIOS Y OBSERVACIONES"),
     };
 
     for (const [k, v] of Object.entries(map)) {
       xml = xml.split(k).join(toWordInline(v));
     }
+
+    const det = {
+      sif: payload.asistentes.sif_det || (payload.asistentes.sif || []).map((n) => ({ nombre: n, cargo: "" })),
+      edu: payload.asistentes.edu_det || (payload.asistentes.edu || []).map((n) => ({ nombre: n, cargo: "" })),
+      int: payload.asistentes.interventoria_det || (payload.asistentes.interventoria || []).map((n) => ({ nombre: n, cargo: "" })),
+      con: payload.asistentes.contratista_det || (payload.asistentes.contratista || []).map((n) => ({ nombre: n, cargo: "" })),
+    };
+
+    xml = replaceParagraphWithXml(
+      xml,
+      "{{asistentes_sif}}",
+      buildTableXml(["NOMBRE", "CARGO"], det.sif.map((a) => [a.nombre || "", a.cargo || ""]))
+    );
+    xml = replaceParagraphWithXml(
+      xml,
+      "{{asistentes_edu}}",
+      buildTableXml(["NOMBRE", "CARGO"], det.edu.map((a) => [a.nombre || "", a.cargo || ""]))
+    );
+    xml = replaceParagraphWithXml(
+      xml,
+      "{{asistentes_interventoria}}",
+      buildTableXml(["NOMBRE", "CARGO"], det.int.map((a) => [a.nombre || "", a.cargo || ""]))
+    );
+    xml = replaceParagraphWithXml(
+      xml,
+      "{{asistentes_contratista}}",
+      buildTableXml(["NOMBRE", "CARGO"], det.con.map((a) => [a.nombre || "", a.cargo || ""]))
+    );
+
+    const rowsActividad = (payload.rows || []).map((r) => [
+      r.actor || "",
+      r.compromiso || "",
+      r.componente || "",
+      r.responsable || r.actor || "",
+      r.fechaLimite || "",
+      r.estado || "",
+      r.observacion || "",
+    ]);
+
+    const headersActividad = ["ACTOR", "COMPROMISO", "COMPONENTE", "RESPONSABLE", "FECHA", "ESTADO", "OBSERVACIÓN"];
+    xml = replaceParagraphWithXml(xml, "{{tabla_actividades}}", buildTableXml(headersActividad, rowsActividad));
+    xml = replaceParagraphWithXml(xml, "{{tabla_compromisos}}", buildTableXml(headersActividad, rowsActividad));
 
     zip.file("word/document.xml", xml);
     const out = await zip.generateAsync({ type: "nodebuffer" });
