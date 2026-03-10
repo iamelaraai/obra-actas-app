@@ -69,6 +69,8 @@ export default function Home() {
   const [audioTranscripcionUrl, setAudioTranscripcionUrl] = useState("");
   const [excelTemplateName, setExcelTemplateName] = useState<string>("");
   const [wordTemplateName, setWordTemplateName] = useState<string>("");
+  const [officialTemplate, setOfficialTemplate] = useState<File | null>(null);
+  const [exportingOfficial, setExportingOfficial] = useState(false);
 
   const [proyecto, setProyecto] = useState("Parque Primavera Norte");
   const [actaNo, setActaNo] = useState("19");
@@ -144,6 +146,47 @@ ${resumenReunion || "(Pegar aquí resumen de reunión)"}
 ${compromisos || "(Sin compromisos cargados)"}`;
   }, [rows, actaNo, proyecto, fecha, lugar, horaInicio, horaFin, resumenEjecutivo, resumenReunion]);
 
+  const exportOfficialExcel = async () => {
+    if (!officialTemplate) {
+      alert("Primero carga la plantilla oficial (.xlsx)");
+      return;
+    }
+    setExportingOfficial(true);
+    try {
+      const payload = rows
+        .filter((r) => r.compromiso.trim())
+        .map((r) => ({
+          actor: r.actor,
+          responsable: r.responsable || r.actor,
+          compromiso: r.compromiso,
+          componente: r.componente,
+          fechaLimite: r.fechaLimite,
+          estado: r.estado,
+          observacion: r.observacion,
+        }));
+
+      const fd = new FormData();
+      fd.append("template", officialTemplate);
+      fd.append("rows", JSON.stringify(payload));
+      fd.append("sheetName", `Acta ${actaNo || "19"}`);
+
+      const res = await fetch("/api/export-official", { method: "POST", body: fd });
+      if (!res.ok) throw new Error("No se pudo generar el Excel oficial");
+
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `compromisos_acta_${actaNo || "hoy"}_formato_oficial.xlsx`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      alert("Error exportando formato oficial");
+    } finally {
+      setExportingOfficial(false);
+    }
+  };
+
   return (
     <div className="wrap">
       <h1 className="title">📋 Obra Actas — Web</h1>
@@ -212,6 +255,15 @@ ${compromisos || "(Sin compromisos cargados)"}`;
             <a className="btn secondary" href={`data:text/csv;charset=utf-8,${encodeURIComponent(csv)}`} download="compromisos_web.csv">
               Descargar CSV
             </a>
+            <input
+              type="file"
+              className="input"
+              accept=".xlsx"
+              onChange={(e) => setOfficialTemplate(e.target.files?.[0] || null)}
+            />
+            <button className="btn" onClick={exportOfficialExcel} disabled={exportingOfficial || !officialTemplate}>
+              {exportingOfficial ? "Generando..." : "Descargar Excel formato oficial"}
+            </button>
           </div>
         </>
       )}
