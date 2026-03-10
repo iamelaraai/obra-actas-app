@@ -411,10 +411,14 @@ with tab0:
         },
     )
 
-    st.session_state["captura_df"] = edited_df[base_cols].copy()
+    # Evita sobreescrituras accidentales cuando Streamlit re-renderiza en estados intermedios
+    if isinstance(edited_df, pd.DataFrame) and set(base_cols).issubset(set(edited_df.columns)):
+        if len(edited_df) > 0 or len(st.session_state.get("captura_df", pd.DataFrame())) == 0:
+            st.session_state["captura_df"] = edited_df[base_cols].copy()
 
-    captura_df = st.session_state["captura_df"].copy()
-    captura_df = captura_df[captura_df["Compromiso"].astype(str).str.strip() != ""]
+    # Tabla visible (sin filtrar) y tabla procesada (solo filas con compromiso)
+    captura_df_visible = st.session_state["captura_df"].copy()
+    captura_df = captura_df_visible[captura_df_visible["Compromiso"].astype(str).str.strip() != ""].copy()
 
     if not captura_df.empty:
         captura_df.insert(
