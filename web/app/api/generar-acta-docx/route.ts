@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
+import { access } from "node:fs/promises";
 
 const execFileAsync = promisify(execFile);
 
@@ -30,7 +31,15 @@ export async function POST(req: Request) {
 
     const scriptPath = path.resolve(process.cwd(), "..", "scripts", "generate_acta_docx.py");
 
-    await execFileAsync("python3", [scriptPath, templatePath, payloadPath, outputPath]);
+    // Prefer project venv python when available (contains python-docx)
+    const venvPy = path.resolve(process.cwd(), "..", ".venv", "bin", "python");
+    let pyBin = "python3";
+    try {
+      await access(venvPy);
+      pyBin = venvPy;
+    } catch {}
+
+    await execFileAsync(pyBin, [scriptPath, templatePath, payloadPath, outputPath]);
 
     const out = await readFile(outputPath);
     return new NextResponse(out, {
