@@ -5,6 +5,7 @@ from docx import Document
 
 
 def iter_paragraphs(doc):
+    # body
     for p in doc.paragraphs:
         yield p
     for t in doc.tables:
@@ -12,6 +13,19 @@ def iter_paragraphs(doc):
             for c in r.cells:
                 for p in c.paragraphs:
                     yield p
+
+    # headers/footers
+    for section in doc.sections:
+        for container in [section.header, section.first_page_header, section.even_page_header, section.footer, section.first_page_footer, section.even_page_footer]:
+            if container is None:
+                continue
+            for p in container.paragraphs:
+                yield p
+            for t in container.tables:
+                for r in t.rows:
+                    for c in r.cells:
+                        for p in c.paragraphs:
+                            yield p
 
 
 def replace_all_text(doc, mapping):
@@ -144,6 +158,9 @@ def main():
         "{{hora_fin}}": payload.get("meta", {}).get("hora_fin", ""),
         "{{asistentes_total}}": str(total_asist),
         "{{resumen_comite_tecnico}}": payload.get("resumenReunion", ""),
+        "{{pagina}}": payload.get("meta", {}).get("pagina", "1"),
+        "{{página}}": payload.get("meta", {}).get("pagina", "1"),
+        "{{página)}}": payload.get("meta", {}).get("pagina", "1"),
     }
 
     replace_all_text(doc, mapping)
