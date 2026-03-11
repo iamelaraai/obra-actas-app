@@ -40,6 +40,7 @@ def find_marker_paragraph(doc, marker):
 
 def make_table(doc, headers, rows):
     table = doc.add_table(rows=1, cols=len(headers))
+    table.style = 'Table Grid'
     for i, h in enumerate(headers):
         table.rows[0].cells[i].text = h
 
@@ -60,6 +61,8 @@ def insert_table_after_paragraph(doc, paragraph, headers, rows):
     except Exception:
         # fallback: keep table at end if Word structure is unusual
         pass
+    # add spacing paragraph after each inserted table
+    doc.add_paragraph('')
     return table
 
 
@@ -91,6 +94,7 @@ def place_grouped_commitments(doc, marker, rows):
         if not sub:
             continue
 
+        doc.add_paragraph('')
         # heading paragraph
         hp = doc.add_paragraph(f"Compromisos {g}:")
         try:
