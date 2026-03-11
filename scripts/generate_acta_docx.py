@@ -38,9 +38,15 @@ def find_marker_paragraph(doc, marker):
     return None
 
 
-def insert_table_after(paragraph, headers, rows):
+def insert_table_after(doc, paragraph, headers, rows):
     parent = paragraph._parent
-    table = parent.add_table(rows=1, cols=len(headers))
+
+    # Some parents (cells/body) behave differently; use safest insertion path.
+    try:
+        table = parent.add_table(rows=1, cols=len(headers))
+    except Exception:
+        table = doc.add_table(rows=1, cols=len(headers))
+
     for i, h in enumerate(headers):
         table.rows[0].cells[i].text = h
 
@@ -52,7 +58,6 @@ def insert_table_after(paragraph, headers, rows):
         for i in range(len(headers)):
             cells[i].text = str(row[i]) if i < len(row) else ""
 
-    paragraph._p.addnext(table._tbl)
     return table
 
 
@@ -60,7 +65,7 @@ def place_table_or_append(doc, marker, title, headers, rows):
     p = find_marker_paragraph(doc, marker)
     if p is not None:
         p.text = title
-        insert_table_after(p, headers, rows)
+        insert_table_after(doc, p, headers, rows)
     else:
         doc.add_heading(title, level=2)
         t = doc.add_table(rows=1, cols=len(headers))
