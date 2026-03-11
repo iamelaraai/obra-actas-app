@@ -2,6 +2,10 @@ import json
 import sys
 from pathlib import Path
 from docx import Document
+from docx.shared import Pt, RGBColor
+from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.oxml import OxmlElement
+from docx.oxml.ns import qn
 
 
 def iter_paragraphs(doc):
@@ -28,6 +32,31 @@ def iter_paragraphs(doc):
                             yield p
 
 
+def set_cell_shading(cell, fill_hex):
+    tc_pr = cell._tc.get_or_add_tcPr()
+    shd = OxmlElement('w:shd')
+    shd.set(qn('w:val'), 'clear')
+    shd.set(qn('w:color'), 'auto')
+    shd.set(qn('w:fill'), fill_hex)
+    tc_pr.append(shd)
+
+
+def style_cell_text(cell, bold=False, color_hex='000000', size_pt=9, align='left'):
+    p = cell.paragraphs[0]
+    if align == 'center':
+        p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    elif align == 'right':
+        p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+    else:
+        p.alignment = WD_ALIGN_PARAGRAPH.LEFT
+
+    for run in p.runs:
+        run.font.name = 'Arial'
+        run.font.size = Pt(size_pt)
+        run.bold = bold
+        run.font.color.rgb = RGBColor.from_string(color_hex)
+
+
 def replace_all_text(doc, mapping):
     for p in iter_paragraphs(doc):
         txt = p.text or ""
@@ -52,24 +81,47 @@ def find_marker_paragraph(doc, marker):
     return None
 
 
-def make_table(doc, headers, rows):
+def make_table(doc, headers, rows, status_col_idx=None):
     table = doc.add_table(rows=1, cols=len(headers))
     table.style = 'Table Grid'
+
+    # Header style
     for i, h in enumerate(headers):
-        table.rows[0].cells[i].text = h
+        cell = table.rows[0].cells[i]
+        cell.text = h
+        set_cell_shading(cell, '1F3864')
+        style_cell_text(cell, bold=True, color_hex='FFFFFF', size_pt=9, align='center')
 
     if not rows:
         rows = [["Sin registros"] + [""] * (len(headers) - 1)]
 
-    for row in rows:
+    for ridx, row in enumerate(rows):
         cells = table.add_row().cells
         for i in range(len(headers)):
-            cells[i].text = str(row[i]) if i < len(row) else ""
+            val = str(row[i]) if i < len(row) else ""
+            cells[i].text = val
+
+            # zebra rows
+            if ridx % 2 == 1:
+                set_cell_shading(cells[i], 'F2F2F2')
+
+            # status semantic color
+            if status_col_idx is not None and i == status_col_idx:
+                v = val.strip().lower()
+                if v == 'cumplido':
+                    set_cell_shading(cells[i], 'D4EDDA')
+                elif v in ('en proceso', 'cumplido parcialmente', 'pendiente', 'pendiente por definir'):
+                    set_cell_shading(cells[i], 'FFF3CD')
+                elif v == 'no cumplido':
+                    set_cell_shading(cells[i], 'F8D7DA')
+
+            style_cell_text(cells[i], bold=False, color_hex='111111', size_pt=9, align='left')
+
     return table
 
 
-def insert_table_after_paragraph(doc, paragraph, headers, rows):
-    table = make_table(doc, headers, rows)
+def insert_table_after_paragraph(doc, paragraph, headers, rows, status_col_idx=None):
+    table = make_table(doc, headers, rows, status_col_idx=status_col_idx)
     try:
         paragraph._p.addnext(table._tbl)
     except Exception:
@@ -80,15 +132,25 @@ def insert_table_after_paragraph(doc, paragraph, headers, rows):
     return table
 
 
-def place_table_or_append(doc, marker, title, headers, rows):
+def place_table_or_append(doc, marker, title, headers, rows, status_col_idx=None):
     p = find_marker_paragraph(doc, marker)
     if p is not None:
         p.text = title
-        insert_table_after_paragraph(doc, p, headers, rows)
+        # style heading
+        if p.runs:
+            for r in p.runs:
+                r.font.name = 'Arial'
+                r.font.bold = True
+                r.font.size = Pt(11)
+                r.font.color.rgb = RGBColor.from_string('1F3864')
+        insert_table_after_paragraph(doc, p, headers, rows, status_col_idx=status_col_idx)
         doc.add_paragraph('')
     else:
-        doc.add_heading(title, level=2)
-        make_table(doc, headers, rows)
+        h = doc.add_heading(title, level=2)
+        if h.runs:
+            for r in h.runs:
+                r.font.color.rgb = RGBColor.from_string('1F3864')
+        make_table(doc, headers, rows, status_col_idx=status_col_idx)
         doc.add_paragraph('')
 
 
@@ -191,7 +253,7 @@ def main():
         for r in rows
     ]
     headers_actividad = ["COMPROMISO", "RESPONSABLE", "FECHA", "ESTADO", "OBSERVACIÓN"]
-    place_table_or_append(doc, "{{tabla_actividades}}", "Tabla de actividades", headers_actividad, data_rows)
+    place_table_or_append(doc, "{{tabla_actividades}}", "Tabla de actividades", headers_actividad, data_rows, status_col_idx=3)
 
     # 3) Compromisos por entidad (formato solicitado)
     place_grouped_commitments(doc, "{{tabla_compromisos}}", rows)
