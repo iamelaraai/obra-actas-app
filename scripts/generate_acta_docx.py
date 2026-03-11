@@ -71,9 +71,11 @@ def place_table_or_append(doc, marker, title, headers, rows):
     if p is not None:
         p.text = title
         insert_table_after_paragraph(doc, p, headers, rows)
+        doc.add_paragraph('')
     else:
         doc.add_heading(title, level=2)
         make_table(doc, headers, rows)
+        doc.add_paragraph('')
 
 
 def place_grouped_commitments(doc, marker, rows):
