@@ -110,6 +110,7 @@ export default function Home() {
   const [transcript, setTranscript] = useState("");
   const [audioTranscripcionUrl, setAudioTranscripcionUrl] = useState("");
   const [excelTemplateName, setExcelTemplateName] = useState<string>("");
+  const [importingExcel, setImportingExcel] = useState(false);
   const [wordTemplateName, setWordTemplateName] = useState<string>("");
   const [wordTemplateFile, setWordTemplateFile] = useState<File | null>(null);
   const [officialTemplate, setOfficialTemplate] = useState<File | null>(null);
@@ -251,6 +252,41 @@ ${compromisos || "(Sin compromisos cargados)"}`;
       alert("Error exportando formato oficial");
     } finally {
       setExportingOfficial(false);
+    }
+  };
+
+  const importCompromisosFromExcel = async (file: File | null) => {
+    if (!file) return;
+    setImportingExcel(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch("/api/parse-compromisos", { method: "POST", body: fd });
+      if (!res.ok) throw new Error("No se pudo leer el Excel");
+      const data = await res.json();
+      const parsed = (data.rows || []) as any[];
+      if (!parsed.length) {
+        alert("No se encontraron compromisos en ese Excel.");
+      } else {
+        setRows(
+          parsed.map((r) => ({
+            actaNo: actaNo || "",
+            fechaComite: fecha || todayISO,
+            actor: (r.actor || "EDU") as Row["actor"],
+            compromiso: r.compromiso || "",
+            componente: r.componente || "",
+            responsable: r.responsable || r.actor || "",
+            fechaLimite: r.fechaLimite || "",
+            estado: r.estado || "En proceso",
+            notasRapidas: "",
+            observacion: r.observacion || "",
+          }))
+        );
+      }
+    } catch (e: any) {
+      alert(`Error importando Excel: ${e?.message || e}`);
+    } finally {
+      setImportingExcel(false);
     }
   };
 
@@ -456,8 +492,17 @@ ${compromisos || "(Sin compromisos cargados)"}`;
 
           <div className="row" style={{ marginTop: 8 }}>
             <label className="small">Excel actividades:</label>
-            <input type="file" className="input" accept=".xlsx,.xlsm" onChange={(e)=>setExcelTemplateName(e.target.files?.[0]?.name || "")} />
-            <span className="small">{excelTemplateName || "(sin cargar)"}</span>
+            <input
+              type="file"
+              className="input"
+              accept=".xlsx,.xlsm"
+              onChange={(e) => {
+                const f = e.target.files?.[0] || null;
+                setExcelTemplateName(f?.name || "");
+                importCompromisosFromExcel(f);
+              }}
+            />
+            <span className="small">{importingExcel ? "Importando..." : (excelTemplateName || "(sin cargar)")}</span>
           </div>
 
           <div className="row" style={{ marginTop: 8 }}>
