@@ -29,7 +29,8 @@ export async function POST(req: Request) {
 
     const wb = new ExcelJS.Workbook();
     await wb.xlsx.load(Buffer.from(await file.arrayBuffer()));
-    const ws = wb.worksheets[0];
+    // Siempre usar la última pestaña (ej: Acta 19)
+    const ws = wb.worksheets[wb.worksheets.length - 1];
     if (!ws) return NextResponse.json({ rows: [] });
 
     const rows: OutRow[] = [];
