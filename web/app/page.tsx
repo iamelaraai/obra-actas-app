@@ -30,7 +30,7 @@ function generarObs(estado: string, actor: string, compromiso: string, notas: st
 }
 
 function buildTranscriptPrompt(contexto: string, transcript: string) {
-  return `Eres asistente de interventoría de obra. Redacta sección de acta en español formal y técnico.
+  return `Eres asistente de interventoría de obra. Redacta texto para acta en español formal, técnico e institucional, siguiendo el estilo de comité de obra.
 
 Contexto del proyecto:
 ${contexto}
@@ -40,28 +40,79 @@ ${transcript}
 
 Instrucciones de salida:
 - Devuelve la respuesta en texto plano (sin markdown, sin tablas markdown, sin asteriscos).
-- Organiza estrictamente con estos encabezados y en este orden:
+- Escribe en tercera persona (“Desde la Interventoría se informa…”, “Desde el Contratista se reporta…”).
+- Mantén datos numéricos exactos (porcentajes, fechas, códigos de comunicación, hitos).
+- No inventes información. Si falta, escribir: "Sin información reportada".
 
-DECISIONES TOMADAS:
-- ...
+Organiza estrictamente en este orden:
 
-AVANCES REPORTADOS:
-- ...
+ORDEN DEL DÍA:
+1. Comité técnico
+   - Reporte de avances físicos y financieros
+   - Actividades ejecutadas durante la semana
+   - Actividades proyectadas para la próxima semana
+   - Temas varios
+   - Revisión de compromisos del acta anterior
+2. Reunión componentes transversales
+   2.1 Componente Social
+   2.2 Componente SST
+   2.3 Componente Ambiental
+3. Compromisos, comentarios y observaciones
 
-RIESGOS Y ATRASOS CRÍTICOS:
-- Riesgo: ...
-  Impacto: ...
-  Acción propuesta: ...
-  Responsable: ...
-  Fecha objetivo: ...
+COMITÉ TÉCNICO
+
+REPORTE DE AVANCES FÍSICOS Y FINANCIEROS:
+- Incluir: corte semanal, programado, ejecutado, diferencia (físico y financiero).
+- Agregar análisis técnico breve de causas del desvío y efecto en ruta crítica.
+
+ACTIVIDADES EJECUTADAS DURANTE LA SEMANA:
+- Organizar por frente/zona:
+  - Urbanismo Zona Norte
+  - Urbanismo Zona Sur
+  - Obras de protección del río
+  - Equipamiento cultural
+  - Equipamiento técnico
+- Para cada actividad: nombre, avance %, fecha programada de inicio (si existe), observación técnica.
+
+ANÁLISIS DE ATRASOS CRÍTICOS:
+Para cada actividad en atraso incluir:
+- Actividad:
+- Estado del atraso:
+- Causa técnica/administrativa:
+- Impacto en cronograma/ruta crítica:
+- Acción correctiva:
+- Responsable:
+- Fecha de control:
+- Soporte o comunicación asociada (si aplica):
+
+ACTIVIDADES PROYECTADAS PARA LA PRÓXIMA SEMANA:
+- Organizar por frente/zona.
+- Incluir dependencias y riesgos de ejecución.
+
+REVISIÓN DE COMPROMISOS DEL ACTA ANTERIOR:
+- Resumen del estado: cumplido / en proceso / no cumplido.
+- Hallazgos clave y decisiones de seguimiento.
+
+COMPONENTES TRANSVERSALES:
+2.1 Social:
+2.2 SST:
+2.3 Ambiental:
+(Para cada uno: avances, pendientes, riesgos, compromisos nuevos)
 
 COMPROMISOS NUEVOS:
-- Compromiso: ... | Responsable: ... | Fecha límite: ... | Componente: ...
+- Compromiso:
+- Responsable:
+- Fecha límite:
+- Componente:
+- Estado inicial:
 
 OBSERVACIONES DE CIERRE:
-- ...
+- Síntesis técnica del comité y próximo hito de seguimiento.
 
-Si algún bloque no tiene información suficiente, escribe: "Sin información reportada".`;
+Reglas de estilo:
+- Mantener redacción institucional y continuidad narrativa.
+- Evitar listas excesivamente telegráficas; combinar párrafos técnicos + listas donde aporte claridad.
+- Usar coma decimal en español (ej. 16,33%).`;
 }
 
 function normalizeMeetingText(input: string) {
