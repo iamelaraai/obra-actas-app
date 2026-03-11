@@ -160,12 +160,10 @@ def main():
 
     rows = payload.get("rows", [])
 
-    # 2) Tabla de actividades general
+    # 2) Tabla de actividades general (sin columnas ACTOR y COMPONENTE)
     data_rows = [
         [
-            r.get("actor", ""),
             r.get("compromiso", ""),
-            r.get("componente", ""),
             r.get("responsable", "") or r.get("actor", ""),
             r.get("fechaLimite", ""),
             r.get("estado", ""),
@@ -173,7 +171,7 @@ def main():
         ]
         for r in rows
     ]
-    headers_actividad = ["ACTOR", "COMPROMISO", "COMPONENTE", "RESPONSABLE", "FECHA", "ESTADO", "OBSERVACIÓN"]
+    headers_actividad = ["COMPROMISO", "RESPONSABLE", "FECHA", "ESTADO", "OBSERVACIÓN"]
     place_table_or_append(doc, "{{tabla_actividades}}", "Tabla de actividades", headers_actividad, data_rows)
 
     # 3) Compromisos por entidad (formato solicitado)
