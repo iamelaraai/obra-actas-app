@@ -44,6 +44,14 @@ Instrucciones de salida:
 - Mantén datos numéricos exactos (porcentajes, fechas, códigos de comunicación, hitos).
 - No inventes información. Si falta, escribir: "Sin información reportada".
 
+RESTRICCIÓN CRÍTICA (OBLIGATORIA):
+- NO redactes el acta final completa.
+- NO incluyas apertura/cierre de acta narrativa larga.
+- Tu salida será usada como insumo intermedio para un sistema de generación automática.
+- Entrega solo contenido estructurado, breve y reutilizable.
+- Máximo 3–6 ítems por sección (excepto actividades).
+- Sin texto repetido ni explicaciones fuera de los bloques.
+
 Organiza estrictamente en este orden:
 
 ORDEN DEL DÍA:
@@ -100,11 +108,8 @@ COMPONENTES TRANSVERSALES:
 (Para cada uno: avances, pendientes, riesgos, compromisos nuevos)
 
 COMPROMISOS NUEVOS:
-- Compromiso:
-- Responsable:
-- Fecha límite:
-- Componente:
-- Estado inicial:
+- Cada compromiso en una línea con este patrón exacto:
+  Compromiso: ... | Responsable: ... | Fecha límite: ... | Componente: ... | Estado inicial: ...
 
 OBSERVACIONES DE CIERRE:
 - Síntesis técnica del comité y próximo hito de seguimiento.
